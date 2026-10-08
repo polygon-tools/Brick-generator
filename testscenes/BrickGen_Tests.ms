@@ -46,14 +46,14 @@
 		)
 	)
 
+	-- Forces a rebuild (seed change) and returns #(ms, tris) as measured
+	-- inside buildMesh, so cached meshes cannot report 0 ms.
 	fn buildMs obj =
 	(
-		local t0 = timeStamp()
+		obj.seed += 1
 		local m = snapshotAsMesh obj
-		local ms = timeStamp() - t0
-		local nf = m.numfaces
 		delete m
-		#(ms, nf)
+		#(BrickGenSettings.lastBuildMs, BrickGenSettings.lastTris)
 	)
 
 	format "\n===== BrickGen tests (% , systeemeenheid %) =====\n" (maxVersion())[1] units.SystemType

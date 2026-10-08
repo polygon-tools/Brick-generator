@@ -224,7 +224,9 @@ struct BrickGenMeshStruct
 			-- faces come in pairs (a,b,c) (a,c,d): hide the diagonal a-c
 			if (mod f 2) == 1 then setEdgeVis m f 3 false else setEdgeVis m f 1 false
 		)
-		-- map verts = geometry verts, map faces = geometry faces
+		-- map verts = geometry verts, map faces = geometry faces.
+		-- A fresh mesh only has channels 0 and 1: allocate channel 2 first.
+		if (meshop.getNumMaps m) < 3 do meshop.setNumMaps m 3 keep:true
 		for ch = 1 to 2 do
 		(
 			local uv = if ch == 1 then buf.uv1 else buf.uv2
