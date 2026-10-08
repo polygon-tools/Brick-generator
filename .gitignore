@@ -1,0 +1,12 @@
+# 3ds Max autosave / backups
+*.max.bak
+*_autoback*.max
+autoback/
+# renders and caches
+*.vrmesh
+*.vrimg
+*.exr
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini

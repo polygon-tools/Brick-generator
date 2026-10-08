@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "note": "Maten in mm (L x B x H). Nakijken bij de fabrikant.",
+  "formats": [
+    { "name": "Waalformaat",  "L": 210, "B": 100, "H": 50 },
+    { "name": "Dikformaat",   "L": 210, "B": 100, "H": 65 },
+    { "name": "Vechtformaat", "L": 210, "B": 100, "H": 40 },
+    { "name": "Modulair",     "L": 190, "B": 90,  "H": 50 }
+  ]
+}
