@@ -29,16 +29,36 @@ struct BrickGenRNGStruct
 		mix ((mix ((seed as integer64) + 9973L)) + (idx as integer64) * 7919L + 1L)
 	),
 
-	-- Uniform float in [0, 1) for a channel of a brick key.
-	fn u01 key ch =
+	-- Hash of a channel of a brick key, integer in [0, P).
+	fn hashCh key ch =
 	(
 		local x = key + (ch as integer64) * 104729L + 7L
 		x = modP (x * x + 1013904223L)
 		x = modP (x * 48271L)
-		x = modP (x * x + 362437L)
-		local r = (x as float) / 2147483647.0
+		modP (x * x + 362437L)
+	),
+
+	-- Uniform float in [0, 1) for a channel of a brick key.
+	fn u01 key ch =
+	(
+		local r = ((hashCh key ch) as float) / 2147483647.0
 		if r >= 1.0 then 0.9999999 else r
 	),
+
+	-- Three uniform floats in [0, 1) from one hash (10/10/11 bits).
+	-- One channel = three values; much cheaper than three u01 calls.
+	fn u01x3 key ch =
+	(
+		local x = hashCh key ch
+		local a = x - (x / 1024L) * 1024L
+		x = x / 1024L
+		local b = x - (x / 1024L) * 1024L
+		local c = x / 1024L
+		[(a as float) / 1024.0, (b as float) / 1024.0, (c as float) / 2048.0]
+	),
+
+	-- Three uniform floats in [-1, 1).
+	fn sym3 key ch = ( 2.0 * (u01x3 key ch) - [1.0, 1.0, 1.0] ),
 
 	-- Uniform float in [-1, 1).
 	fn sym key ch = ( 2.0 * (u01 key ch) - 1.0 ),

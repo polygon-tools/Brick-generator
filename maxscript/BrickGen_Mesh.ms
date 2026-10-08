@@ -38,7 +38,7 @@ struct BrickGenMeshStruct
 	MIN_PIECE = 1.0, -- mm; thinner slivers at the wall edge are skipped
 
 	-- Quad a-b-c-d, counter-clockwise seen from outside. Triangles (a,b,c) and
-	-- (a,c,d); the shared diagonal a-c is hidden in applyToMesh.
+	-- (a,c,d); the shared diagonal a-c is hidden by autoEdge in applyToMesh.
 	fn addQuad buf a b c d sg mat =
 	(
 		append buf.faces [a, b, c]
@@ -49,20 +49,55 @@ struct BrickGenMeshStruct
 		append buf.smooth sg
 	),
 
+	-- Faces of one brick as 1-based offsets from the vertex count before it, built once:
+	-- front, then per side k the chamfer quad and the side quad.
+	BRICK_FACES = #(),
+	BRICK_SMOOTH = #(),
+
+	fn initBrickTemplate =
+	(
+		-- quads as #(a, b, c, d, smoothing group)
+		local quads = #(#(1, 2, 3, 4, SG_FRONT))
+		for k = 1 to 4 do
+		(
+			local kn = if k == 4 then 1 else k + 1
+			append quads #(kn, k, 4 + k, 4 + kn, SG_SIDES)
+			append quads #(4 + kn, 4 + k, 8 + k, 8 + kn, SG_SIDES)
+		)
+		local faces = #()
+		local smooth = #()
+		for q in quads do
+		(
+			append faces [q[1], q[2], q[3]]
+			append faces [q[1], q[3], q[4]]
+			append smooth q[5]
+			append smooth q[5]
+		)
+		BRICK_FACES = faces
+		BRICK_SMOOTH = smooth
+		faces.count
+	),
+
 	-- x0..x1 / z0..z1: (clipped) brick extent in mm.
 	-- nomX0 / nomL: unclipped start and length (for UVs).
 	-- clipL / clipR / clipT: that edge is sawn at the wall boundary.
+	--
+	-- RNG channels (each gives three values, see BrickGenRNG.u01x3):
+	--   1: size L, size H, chamfer      2: depth, rotation, material ID
+	--   11..18: corner jitter x, z, y for front vertex 1..8
 	fn addBrick buf p idx x0 x1 z0 z1 nomX0 nomL nomZ0 clipL clipR clipT =
 	(
 		local R = BrickGenRNG
 		local key = R.brickKey p.seed idx
 		local jitter = not p.previewMode
+		local r1 = if jitter then R.sym3 key 1 else [0.0, 0.0, 0.0]
+		local r2 = R.u01x3 key 2
 
 		-- 1. size jitter (only on free edges)
 		if jitter and p.sizeJitter > 0.0 do
 		(
-			local dL = 0.5 * p.sizeJitter * (R.sym key 1)
-			local dH = 0.5 * p.sizeJitter * (R.sym key 2)
+			local dL = 0.5 * p.sizeJitter * r1.x
+			local dH = 0.5 * p.sizeJitter * r1.y
 			if not clipL do x0 -= dL
 			if not clipR do x1 += dL
 			z0 = amax 0.0 (z0 - dH)
@@ -73,7 +108,7 @@ struct BrickGenMeshStruct
 		local w = x1 - x0
 		local h = z1 - z0
 		local c = 0.0
-		if jitter do c = p.chamfer * (1.0 + p.chamferJitter * (R.sym key 3))
+		if jitter do c = p.chamfer * (1.0 + p.chamferJitter * r1.z)
 		c = amax 0.0 (amin c (0.5 * (amin w h) - 0.05))
 		local cL = if clipL then 0.0 else c
 		local cR = if clipR then 0.0 else c
@@ -88,16 +123,15 @@ struct BrickGenMeshStruct
 		-- 3. corner jitter on the 8 front vertices; sawn edges stay straight
 		if jitter and p.cornerJitter > 0.0 do
 		(
+			local cj = p.cornerJitter
 			for v = 1 to 8 do
 			(
 				local k = if v > 4 then v - 4 else v
 				local onLeft = (k == 1 or k == 4)
 				local onTop = (k == 3 or k == 4)
 				local sawnX = if onLeft then clipL else clipR
-				local jx = if sawnX then 0.0 else p.cornerJitter * (R.sym key (10 + v))
-				local jz = if onTop and clipT then 0.0 else p.cornerJitter * (R.sym key (20 + v))
-				local jy = 0.3 * p.cornerJitter * (R.sym key (30 + v))
-				pts[v] = pts[v] + [jx, jy, jz]
+				local j = R.sym3 key (10 + v)
+				pts[v] = pts[v] + [(if sawnX then 0.0 else cj * j.x), 0.3 * cj * j.z, (if onTop and clipT then 0.0 else cj * j.y)]
 			)
 		)
 
@@ -105,24 +139,26 @@ struct BrickGenMeshStruct
 		for v = 5 to 8 do append pts [pts[v].x, depth, pts[v].z]
 
 		-- channel 1 before depth/rotation, so the texture moves with the brick
-		local uv1 = for pt in pts collect BrickGenUV.brickUV pt.x pt.z nomX0 nomZ0 nomL p.brickH
+		local invL = 1.0 / nomL
+		local invH = 1.0 / p.brickH
+		local uv1 = for pt in pts collect [(pt.x - nomX0) * invL, (pt.z - nomZ0) * invH, 0.0]
 
 		-- 4. depth jitter
 		if jitter and p.depthJitter > 0.0 do
 		(
-			local dy = p.depthJitter * (R.sym key 4)
-			for i = 1 to pts.count do pts[i] = pts[i] + [0.0, dy, 0.0]
+			local dyv = [0.0, p.depthJitter * (2.0 * r2.x - 1.0), 0.0]
+			for i = 1 to 12 do pts[i] = pts[i] + dyv
 		)
 
 		-- 5. rotation around Y through the brick centre (not for sawn bricks)
 		if jitter and p.rotJitter > 0.0 and not (clipL or clipR or clipT) do
 		(
-			local a = p.rotJitter * (R.sym key 5)
+			local a = p.rotJitter * (2.0 * r2.y - 1.0)
 			local ca = cos a
 			local sa = sin a
 			local cx = 0.5 * (x0 + x1)
 			local cz = 0.5 * (z0 + z1)
-			for i = 1 to pts.count do
+			for i = 1 to 12 do
 			(
 				local dx = pts[i].x - cx
 				local dz = pts[i].z - cz
@@ -130,7 +166,8 @@ struct BrickGenMeshStruct
 			)
 		)
 
-		local mat = R.randInt key 6 1 (amax 1 p.matIdCount)
+		local n = amax 1 p.matIdCount
+		local mat = amin n (1 + ((floor (r2.z * n)) as integer))
 
 		local base = buf.verts.count
 		local s = p.unitScale
@@ -139,18 +176,15 @@ struct BrickGenMeshStruct
 			local pt = pts[i]
 			append buf.verts (pt * s)
 			append buf.uv1 uv1[i]
-			append buf.uv2 (BrickGenUV.planarUV pt.x pt.z)
+			append buf.uv2 [pt.x * 0.001, pt.z * 0.001, 0.0]
 		)
 
-		-- faces
-		addQuad buf (base + 1) (base + 2) (base + 3) (base + 4) SG_FRONT mat
-		for k = 1 to 4 do
+		local bv = [base, base, base]
+		for f = 1 to 18 do
 		(
-			local kn = if k == 4 then 1 else k + 1
-			-- chamfer ring
-			addQuad buf (base + kn) (base + k) (base + 4 + k) (base + 4 + kn) SG_SIDES mat
-			-- side
-			addQuad buf (base + 4 + kn) (base + 4 + k) (base + 8 + k) (base + 8 + kn) SG_SIDES mat
+			append buf.faces (BRICK_FACES[f] + bv)
+			append buf.smooth BRICK_SMOOTH[f]
+			append buf.matIDs mat
 		)
 		buf.brickCount += 1
 	),
@@ -174,6 +208,7 @@ struct BrickGenMeshStruct
 	fn buildWall p =
 	(
 		local buf = BrickGenMeshBuffer()
+		if BRICK_FACES.count != 18 do initBrickTemplate()
 		p.brickL = amax 1.0 p.brickL
 		p.brickB = amax 1.0 p.brickB
 		p.brickH = amax 1.0 p.brickH
@@ -214,16 +249,17 @@ struct BrickGenMeshStruct
 	),
 
 	-- Write the buffer into a TriMesh (the `mesh` of a simpleObject).
+	-- Returns timings in ms: #(setMesh, smoothing+edges, uv).
 	fn applyToMesh m buf =
 	(
+		local t0 = timeStamp()
 		setMesh m verts:buf.verts faces:buf.faces materialIDs:buf.matIDs
+		local t1 = timeStamp()
 		local nf = buf.faces.count
-		for f = 1 to nf do
-		(
-			setFaceSmoothGroup m f buf.smooth[f]
-			-- faces come in pairs (a,b,c) (a,c,d): hide the diagonal a-c
-			if (mod f 2) == 1 then setEdgeVis m f 3 false else setEdgeVis m f 1 false
-		)
+		for f = 1 to nf do setFaceSmoothGroup m f buf.smooth[f]
+		-- hide the quad diagonals (coplanar edges) in one call
+		meshop.autoEdge m #all 5.0 type:#setClear
+		local t2 = timeStamp()
 		-- map verts = geometry verts, map faces = geometry faces.
 		-- A fresh mesh only has channels 0 and 1: allocate channel 2 first.
 		if (meshop.getNumMaps m) < 3 do meshop.setNumMaps m 3 keep:true
@@ -234,7 +270,8 @@ struct BrickGenMeshStruct
 			meshop.defaultMapFaces m ch
 			for i = 1 to uv.count do meshop.setMapVert m ch i uv[i]
 		)
-		m
+		local t3 = timeStamp()
+		#(t1 - t0, t2 - t1, t3 - t2)
 	)
 )
 

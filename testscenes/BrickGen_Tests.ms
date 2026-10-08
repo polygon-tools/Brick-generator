@@ -152,11 +152,11 @@
 	(
 		local small = makeWall 3000 2500
 		local r1 = buildMs small
-		format "TIME  7,5 m2 (3 x 2,5 m): % ms, % tris\n" r1[1] r1[2]
+		format "TIME  7,5 m2 (3 x 2,5 m): % ms, % tris, fasen (geometrie/setMesh/smoothing/uv) %\n" r1[1] r1[2] BrickGenSettings.lastPhases
 		check "7,5 m2 onder 200 ms" (r1[1] < 200) detail:((r1[1] as string) + " ms")
 		local big = makeWall 20000 10000
 		local r2 = buildMs big
-		format "TIME  200 m2 (20 x 10 m): % ms, % tris\n" r2[1] r2[2]
+		format "TIME  200 m2 (20 x 10 m): % ms, % tris, fasen (geometrie/setMesh/smoothing/uv) %\n" r2[1] r2[2] BrickGenSettings.lastPhases
 		check "200 m2 onder 3000 ms" (r2[1] < 3000) detail:((r2[1] as string) + " ms")
 		join created #(small, big)
 	)
