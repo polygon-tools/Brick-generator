@@ -312,6 +312,88 @@ struct BrickGenMeshStruct
 		buf
 	),
 
+	-- Reveals (dagkanten): a strip of bricks depthMm deep along every
+	-- horizontal/vertical edge of every opening (and of the outline when
+	-- includeOuter), facing into the opening. Courses on the jambs use the
+	-- facade's course grid, so the bond runs on round the corner.
+	-- polys / p as for buildRegionInto (p.tm = facade placement).
+	fn buildRevealsInto buf p polys depthMm includeOuter =
+	(
+		if depthMm < MIN_PIECE do return buf
+		local G = BrickGenRegion
+		local T = depthMm
+		local W = 0.0
+		for poly in polys do for pt in poly do if pt.x > W do W = pt.x
+		local strip = 0
+		for pIdx = 1 to polys.count do
+		(
+			local poly = polys[pIdx]
+			local hole = G.isHole polys pIdx
+			if hole or includeOuter do
+			(
+				-- side of the edge the reveal faces: the opening's inside, or
+				-- the outside of the outline
+				local sgn = if (G.signedArea poly) > 0.0 then 1.0 else -1.0
+				if not hole do sgn = -sgn
+				local n = poly.count
+				for i = 1 to n do
+				(
+					local a = poly[i]
+					local b = poly[if i == n then 1 else i + 1]
+					local dx = b.x - a.x
+					local dy = b.y - a.y
+					local nx = -dy * sgn -- normal (left normal * sgn), unnormalised
+					local ny = dx * sgn
+					local stm = undefined
+					local rect = undefined
+					if (abs dx) <= 0.02 * (abs dy) and (abs dy) >= MIN_PIECE then
+					(
+						-- jamb: strip x = depth into the wall, strip z = facade height
+						local ex = 0.5 * (a.x + b.x)
+						local y1 = amin a.y b.y
+						local y2 = amax a.y b.y
+						stm = if nx > 0.0 then
+							matrix3 [0, 1, 0] [-1, 0, 0] [0, 0, 1] [ex, 0, 0]
+						else
+							matrix3 [0, -1, 0] [1, 0, 0] [0, 0, 1] [ex, T, 0]
+						rect = #([0, y1, 0], [T, y1, 0], [T, y2, 0], [0, y2, 0])
+					)
+					else if (abs dy) <= 0.02 * (abs dx) and (abs dx) >= MIN_PIECE do
+					(
+						-- sill (faces up) / head (faces down): strip x = along the
+						-- edge, strip z = depth into the wall
+						local ey = 0.5 * (a.y + b.y)
+						local x1 = amin a.x b.x
+						local x2 = amax a.x b.x
+						if ny > 0.0 then
+						(
+							stm = matrix3 [1, 0, 0] [0, 0, -1] [0, 1, 0] [0, 0, ey]
+							rect = #([x1, 0, 0], [x2, 0, 0], [x2, T, 0], [x1, T, 0])
+						)
+						else
+						(
+							stm = matrix3 [-1, 0, 0] [0, 0, 1] [0, 1, 0] [W, 0, ey]
+							rect = #([W - x2, 0, 0], [W - x1, 0, 0], [W - x1, T, 0], [W - x2, T, 0])
+						)
+					)
+					if stm != undefined do
+					(
+						-- 0.5 mm towards the opening: covers the sawn facade brick ends
+						-- instead of z-fighting with them
+						stm.row4 = stm.row4 - 0.5 * stm.row2
+						strip += 1
+						local q = copy p
+						q.tm = stm * p.tm
+						q.segIndex = p.segIndex + 1000 + strip
+						q.uOffset = 0.0
+						buildRegionInto buf q #(rect)
+					)
+				)
+			)
+		)
+		buf
+	),
+
 	-- Appends one straight wall piece (p.wallLength x p.wallHeight, placed by
 	-- p.tm) to buf. Used for the BrickWall object and per spline segment.
 	fn buildWallInto buf p =

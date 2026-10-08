@@ -34,6 +34,8 @@ plugin simpleMeshMod BrickGenMod
 	(
 		flipSide type:#boolean ui:chkFlip default:false
 		seed type:#integer ui:spnSeed default:12345
+		revealDepth type:#worldUnits ui:spnReveal default:30.0
+		revealOuter type:#boolean ui:chkRevealOuter default:false
 	)
 	rollout rWall "Gevel"
 	(
@@ -41,6 +43,8 @@ plugin simpleMeshMod BrickGenMod
 		spinner spnSeed "Seed:" type:#integer range:[0, 999999999, 12345]
 		button btnNewSeed "Nieuwe seed" width:140
 		on btnNewSeed pressed do seed = random 1 999999
+		spinner spnReveal "Dagkantdiepte:" type:#worldUnits range:[0, 1e6, 30]
+		checkbox chkRevealOuter "Ook langs de buitenrand"
 	)
 
 	-- ----------------------------------------------------------------- Steen
@@ -152,6 +156,15 @@ plugin simpleMeshMod BrickGenMod
 		checkbox chkPreview "Snelle preview (geen chamfer/jitter)"
 	)
 
+	on create do
+	(
+		try (revealDepth = units.decodeValue "300mm") catch ()
+	)
+
+	-- Cache: the geometry is only rebuilt when a parameter or the spline changes.
+	local cacheSig = ""
+	local cacheBuf = undefined
+
 	-- ----------------------------------------------------------------- Build
 	on modifyMesh do
 	(
@@ -164,49 +177,65 @@ plugin simpleMeshMod BrickGenMod
 			BrickGenModWarned = false
 			local s = units.decodeValue "1mm" -- system units per mm
 			local raw = BrickGen_splinePolygons node
-			-- bounding box in mm
-			local minX = 1e30
-			local minY = 1e30
-			local maxX = -1e30
-			for poly in raw do for pt in poly do
-			(
-				if pt.x / s < minX do minX = pt.x / s
-				if pt.y / s < minY do minY = pt.y / s
-				if pt.x / s > maxX do maxX = pt.x / s
-			)
-			-- to wall mm coordinates: x along (mirrored when flipped), y up
-			local polys = for poly in raw where poly.count >= 3 collect
-				for pt in poly collect
-					[(if flipSide then maxX - pt.x / s else pt.x / s - minX), pt.y / s - minY, 0.0]
 
-			local p = BrickGenWallParams()
-			p.unitScale = s
-			-- wall-local (x along, y depth, z up) mm -> spline-local system units.
-			-- Front faces local +Z, or -Z when flipped.
-			p.tm = if flipSide then
-				matrix3 [-s, 0, 0] [0, 0, s] [0, s, 0] [maxX * s, minY * s, 0]
+			local ss = stringStream ""
+			format "%|" s to:ss
+			for n in (getPropNames this) do format "%=%|" n (getProperty this n) to:ss
+			for poly in raw do (for pt in poly do format "%," pt to:ss; format ";" to:ss)
+			local sig = ss as string
+			if sig == cacheSig and cacheBuf != undefined then buf = cacheBuf
 			else
-				matrix3 [s, 0, 0] [0, 0, -s] [0, s, 0] [minX * s, minY * s, 0]
-			p.seed = seed
-			p.brickL = brickL
-			p.brickB = brickB
-			p.brickH = brickH
-			p.bedJoint = bedJoint
-			p.headJoint = headJoint
-			p.jointRecess = jointRecess
-			p.mortarEnabled = mortarEnabled
-			p.bondType = bondType
-			p.startOffset = startOffset
-			p.chamfer = chamfer
-			p.chamferJitter = chamferJitter
-			p.cornerJitter = cornerJitter
-			p.depthJitter = depthJitter
-			p.rotJitter = rotJitter
-			p.sizeJitter = sizeJitter
-			p.matIdCount = matIdCount
-			p.mortarMatId = mortarMatId
-			p.previewMode = previewMode
-			if polys.count > 0 do BrickGenMesh.buildRegionInto buf p polys
+			(
+				-- bounding box in mm
+				local minX = 1e30
+				local minY = 1e30
+				local maxX = -1e30
+				for poly in raw do for pt in poly do
+				(
+					if pt.x / s < minX do minX = pt.x / s
+					if pt.y / s < minY do minY = pt.y / s
+					if pt.x / s > maxX do maxX = pt.x / s
+				)
+				-- to wall mm coordinates: x along (mirrored when flipped), y up
+				local polys = for poly in raw where poly.count >= 3 collect
+					for pt in poly collect
+						[(if flipSide then maxX - pt.x / s else pt.x / s - minX), pt.y / s - minY, 0.0]
+
+				local p = BrickGenWallParams()
+				p.unitScale = s
+				-- wall-local (x along, y depth, z up) mm -> spline-local system units.
+				-- Front faces local +Z, or -Z when flipped.
+				p.tm = if flipSide then
+					matrix3 [-s, 0, 0] [0, 0, s] [0, s, 0] [maxX * s, minY * s, 0]
+				else
+					matrix3 [s, 0, 0] [0, 0, -s] [0, s, 0] [minX * s, minY * s, 0]
+				p.seed = seed
+				p.brickL = brickL
+				p.brickB = brickB
+				p.brickH = brickH
+				p.bedJoint = bedJoint
+				p.headJoint = headJoint
+				p.jointRecess = jointRecess
+				p.mortarEnabled = mortarEnabled
+				p.bondType = bondType
+				p.startOffset = startOffset
+				p.chamfer = chamfer
+				p.chamferJitter = chamferJitter
+				p.cornerJitter = cornerJitter
+				p.depthJitter = depthJitter
+				p.rotJitter = rotJitter
+				p.sizeJitter = sizeJitter
+				p.matIdCount = matIdCount
+				p.mortarMatId = mortarMatId
+				p.previewMode = previewMode
+				if polys.count > 0 do
+				(
+					BrickGenMesh.buildRegionInto buf p polys
+					BrickGenMesh.buildRevealsInto buf (copy p) polys (revealDepth / s) revealOuter
+				)
+				cacheSig = sig
+				cacheBuf = buf
+			)
 		)
 		else if not BrickGenModWarned do
 		(
