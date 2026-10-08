@@ -141,7 +141,7 @@ plugin simpleMeshMod BrickGenMod
 	(
 		matIdCount type:#integer ui:spnMatIdCount default:5
 		mortarMatId type:#integer ui:spnMortarMatId default:100
-		atlasFile type:#string default:""
+		atlasFile type:#string ui:edtAtlasPath default:""
 		atlasFlip type:#boolean ui:chkAtlasFlip default:true
 		atlasRotate type:#boolean ui:chkAtlasRotate default:true
 	)
@@ -152,6 +152,7 @@ plugin simpleMeshMod BrickGenMod
 		group "Textuur-atlas"
 		(
 			edittext edtAtlas "" readOnly:true width:140
+			edittext edtAtlasPath "" readOnly:true visible:false
 			button btnAtlas "Kies atlas..." width:90 across:2
 			button btnAtlasClear "Geen" width:50
 			checkbox chkAtlasFlip "Random spiegelen"
@@ -171,10 +172,20 @@ plugin simpleMeshMod BrickGenMod
 			(
 				if (BrickGenAtlasLib.get f) == undefined then
 					messageBox ("Dit is geen bruikbare BrickGen-atlas:\n" + f) title:"BrickGen"
-				else ( atlasFile = f; refresh() )
+				else
+				(
+					atlasFile = f
+					try (notifyDependents this) catch ()
+					refresh()
+				)
 			)
 		)
-		on btnAtlasClear pressed do ( atlasFile = ""; refresh() )
+		on btnAtlasClear pressed do
+		(
+			atlasFile = ""
+			try (notifyDependents this) catch ()
+			refresh()
+		)
 		on btnMakeMat pressed do
 		(
 			local node = refs.dependentNodes this firstOnly:true
@@ -207,6 +218,8 @@ plugin simpleMeshMod BrickGenMod
 	-- Cache: the geometry is only rebuilt when a parameter or the spline changes.
 	local cacheSig = ""
 	local cacheBuf = undefined
+	local lastAtlasInfo = "geen atlas"
+
 
 	-- ----------------------------------------------------------------- Build
 	on modifyMesh do
@@ -273,6 +286,8 @@ plugin simpleMeshMod BrickGenMod
 				p.mortarMatId = mortarMatId
 				p.previewMode = previewMode
 			p.atlas = BrickGenAtlasLib.get atlasFile
+			lastAtlasInfo = if p.atlas == undefined then "geen atlas" else \
+				(p.atlas.name + ", " + ((p.atlas.stretchers.count + p.atlas.headers.count) as string) + " cellen")
 			p.atlasFlip = atlasFlip
 			p.atlasRotate = atlasRotate
 				if polys.count > 0 do
@@ -299,7 +314,7 @@ plugin simpleMeshMod BrickGenMod
 		BrickGenSettings.lastTris = buf.faces.count
 		BrickGenSettings.lastPhases = #(tGeo) + tApply
 		if BrickGenSettings.logTiming or ms > BrickGenSettings.slowBuildMs do
-			format "BrickGen modifier: % stenen, % tris, % ms (geometrie %, setMesh %, smoothing %, uv %)\n" \
-				buf.brickCount buf.faces.count ms tGeo tApply[1] tApply[2] tApply[3]
+			format "BrickGen modifier: % stenen, % tris, % ms (geometrie %, setMesh %, smoothing %, uv %), %\n" \
+				buf.brickCount buf.faces.count ms tGeo tApply[1] tApply[2] tApply[3] lastAtlasInfo
 	)
 )
