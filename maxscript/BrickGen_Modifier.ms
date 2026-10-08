@@ -230,7 +230,9 @@ plugin simpleMeshMod BrickGenMod
 				p.previewMode = previewMode
 				if polys.count > 0 do
 				(
-					BrickGenMesh.buildRegionInto buf p polys
+					-- with reveals, one brick per course turns each jamb corner
+					local corners = if revealDepth / s >= 1.0 then BrickGenMesh.facadeCorners polys revealOuter else #()
+					BrickGenMesh.buildRegionInto buf p polys corners:corners cornerMode:#facade
 					BrickGenMesh.buildRevealsInto buf (copy p) polys (revealDepth / s) revealOuter
 				)
 				cacheSig = sig

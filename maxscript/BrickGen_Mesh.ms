@@ -240,11 +240,165 @@ struct BrickGenMeshStruct
 		addQuad buf (base + 1) (base + 2) (base + 3) (base + 4) SG_MORTAR p.mortarMatId
 	),
 
+	-- Full brick as a box [x0,x1] x [y0,y1] x [z0,z1] (wall mm) with all 12
+	-- edges chamfered: used where a brick turns a corner (front face on the
+	-- facade AND an end/side face in the reveal). 24 vertices, 44 triangles.
+	fn addBoxBrick buf p idx x0 x1 y0 y1 z0 z1 =
+	(
+		local R = BrickGenRNG
+		local key = R.brickKey (p.seed + p.segIndex * 7919 + 4099) idx
+		local c = if p.previewMode then 0.0 else p.chamfer
+		c = amax 0.0 (amin c (0.45 * (amin (x1 - x0) (amin (y1 - y0) (z1 - z0)))))
+		local ctr = [0.5 * (x0 + x1), 0.5 * (y0 + y1), 0.5 * (z0 + z1)]
+
+		-- vertex (axis a on whose face it lies, box corner ci) -> local index a*8 + ci + 1
+		local loc = #()
+		for a = 0 to 2 do
+			for ci = 0 to 7 do
+			(
+				local sx = if (bit.and ci 1) != 0 then 1.0 else -1.0
+				local sy = if (bit.and ci 2) != 0 then 1.0 else -1.0
+				local sz = if (bit.and ci 4) != 0 then 1.0 else -1.0
+				local px = (if sx > 0 then x1 else x0) - (if a != 0 then sx * c else 0.0)
+				local py = (if sy > 0 then y1 else y0) - (if a != 1 then sy * c else 0.0)
+				local pz = (if sz > 0 then z1 else z0) - (if a != 2 then sz * c else 0.0)
+				append loc [px, py, pz]
+			)
+		fn vi a ci = ( a * 8 + ci + 1 )
+
+		-- polygons as local index lists, with smoothing group
+		local polys = #()
+		local sgs = #()
+		-- 6 faces
+		for a = 0 to 2 do
+			for side = 0 to 1 do
+			(
+				local b = (mod (a + 1) 3) as integer
+				local d = (mod (a + 2) 3) as integer
+				local bitA = (2 ^ a) as integer
+				local bitB = (2 ^ b) as integer
+				local bitD = (2 ^ d) as integer
+				local baseC = side * bitA
+				append polys #(vi a baseC, vi a (baseC + bitB), vi a (baseC + bitB + bitD), vi a (baseC + bitD))
+				append sgs SG_FRONT
+			)
+		-- 12 edge bevels: edge along axis a, between faces b and d
+		for a = 0 to 2 do
+		(
+			local b = (mod (a + 1) 3) as integer
+			local d = (mod (a + 2) 3) as integer
+			local bitA = (2 ^ a) as integer
+			local bitB = (2 ^ b) as integer
+			local bitD = (2 ^ d) as integer
+			for sb = 0 to 1 do
+				for sd = 0 to 1 do
+				(
+					local c0 = sb * bitB + sd * bitD
+					append polys #(vi b c0, vi b (c0 + bitA), vi d (c0 + bitA), vi d c0)
+					append sgs SG_SIDES
+				)
+		)
+		-- 8 corner triangles
+		for ci = 0 to 7 do
+		(
+			append polys #(vi 0 ci, vi 1 ci, vi 2 ci)
+			append sgs SG_SIDES
+		)
+
+		local r2 = R.u01x3 key 2
+		local n = amax 1 p.matIdCount
+		local mat = amin n (1 + ((floor (r2.z * n)) as integer))
+
+		local base = buf.verts.count
+		for k = 1 to 24 do
+		(
+			local pt = loc[k]
+			local a = (k - 1) / 8
+			append buf.verts (pt * p.tm)
+			case a of
+			(
+				0: ( append buf.uv1 [(pt.y - y0) / p.brickL, (pt.z - z0) / p.brickH, 0.0]
+				     append buf.uv2 [pt.y * 0.001, pt.z * 0.001, 0.0] )
+				1: ( append buf.uv1 [(pt.x - x0) / p.brickL, (pt.z - z0) / p.brickH, 0.0]
+				     append buf.uv2 [(pt.x + p.uOffset) * 0.001, pt.z * 0.001, 0.0] )
+				default: ( append buf.uv1 [(pt.x - x0) / p.brickL, (pt.y - y0) / p.brickH, 0.0]
+				           append buf.uv2 [(pt.x + p.uOffset) * 0.001, pt.y * 0.001, 0.0] )
+			)
+		)
+		-- faces, wound so that the normal points away from the box centre
+		for k = 1 to polys.count do
+		(
+			local q = polys[k]
+			local p1 = loc[q[1]]
+			local nrm = cross (loc[q[2]] - p1) (loc[q[3]] - p1)
+			local fc = [0.0, 0.0, 0.0]
+			for v in q do fc += loc[v]
+			fc /= q.count
+			if (dot nrm (fc - ctr)) < 0.0 do q = for m = q.count to 1 by -1 collect q[m]
+			for t = 2 to q.count - 1 do
+			(
+				append buf.faces [base + q[1], base + q[t], base + q[t + 1]]
+				append buf.matIDs mat
+				append buf.smooth sgs[k]
+			)
+		)
+		buf.brickCount += 1
+	),
+
+	-- Horizontal/vertical edges that get a reveal: openings, plus the outline
+	-- when includeOuter. #(#(type, a, b, nx, ny), ...) with type #jamb or
+	-- #horizontal and (nx, ny) the side the reveal faces (unnormalised).
+	fn revealEdges polys includeOuter =
+	(
+		local G = BrickGenRegion
+		local res = #()
+		for pIdx = 1 to polys.count do
+		(
+			local poly = polys[pIdx]
+			local hole = G.isHole polys pIdx
+			if hole or includeOuter do
+			(
+				-- the opening's inside, or the outside of the outline
+				local sgn = if (G.signedArea poly) > 0.0 then 1.0 else -1.0
+				if not hole do sgn = -sgn
+				local n = poly.count
+				for i = 1 to n do
+				(
+					local a = poly[i]
+					local b = poly[if i == n then 1 else i + 1]
+					local dx = b.x - a.x
+					local dy = b.y - a.y
+					if (abs dx) <= 0.02 * (abs dy) and (abs dy) >= MIN_PIECE then
+						append res #(#jamb, a, b, -dy * sgn, dx * sgn)
+					else if (abs dy) <= 0.02 * (abs dx) and (abs dx) >= MIN_PIECE do
+						append res #(#horizontal, a, b, -dy * sgn, dx * sgn)
+				)
+			)
+		)
+		res
+	),
+
+	-- Corner descriptors for the facade: one per jamb, #(xEdge, y1, y2, side)
+	-- with side +1 when the masonry ends at xEdge (opening to the right).
+	fn facadeCorners polys includeOuter =
+	(
+		for e in (revealEdges polys includeOuter) where e[1] == #jamb collect
+			#(0.5 * (e[2].x + e[3].x), amin e[2].y e[3].y, amax e[2].y e[3].y, (if e[4] > 0.0 then 1 else -1))
+	),
+
 	-- Fills a region (closed polygons in wall mm, x along, y up, bounding box
 	-- starting at 0,0; inner polygons are openings) with bricks, placed by p.tm.
 	-- Per course the band is cut at polygon vertex heights; each piece is
 	-- clipped to the inside intervals, so bricks are sawn at every edge.
-	fn buildRegionInto buf p polys =
+	--
+	-- corners: #(#(xEdge, y1, y2, side), ...) where a brick turns a corner. In
+	-- every full course within [y1, y2] the interval ending (side +1) or
+	-- starting (side -1) at xEdge is shortened by the corner brick + a head
+	-- joint. Even courses: stretcher (L) on the facade, header (B) into the
+	-- reveal; odd courses the other way round.
+	-- cornerMode #facade also builds the corner bricks; #reveal (the strip in
+	-- the reveal, whose x runs into the wall) only leaves room for them.
+	fn buildRegionInto buf p polys corners:#() cornerMode:#facade =
 	(
 		sanitize p
 		local G = BrickGenRegion
@@ -272,6 +426,24 @@ struct BrickGenMeshStruct
 			local cdef = BrickGenBonds.courseDef bond c
 			local pieces = BrickGenBonds.layoutCourse cdef (offsets[c + 1] + p.startOffset) maxX p.headJoint p.brickL p.brickB
 
+			-- corners active in this course (only full-height courses turn a corner)
+			local even = (mod c 2) == 0
+			local cw = if even then p.brickL else p.brickB -- along the facade
+			local cd = if even then p.brickB else p.brickL -- into the reveal
+			local trim = (if cornerMode == #facade then cw else cd) + p.headJoint
+			local active = for k = 1 to corners.count where \
+				corners[k][2] <= z0 + 0.5 and zTop <= corners[k][3] + 0.5 and zTop <= maxY collect k
+			if cornerMode == #facade do
+				for k in active do
+				(
+					local e = corners[k]
+					-- 0.5 mm into the opening, flush with the reveal strip (see buildRevealsInto)
+					if e[4] > 0 then
+						addBoxBrick buf p (c * 65536 + 60000 + k) (e[1] - cw) (e[1] + 0.5) 0.0 cd z0 zTop
+					else
+						addBoxBrick buf p (c * 65536 + 60000 + k) (e[1] - 0.5) (e[1] + cw) 0.0 cd z0 zTop
+				)
+
 			-- bricks
 			local cuts = G.bandCuts ys z0 (amin zTop maxY)
 			for i = 1 to cuts.count - 1 do
@@ -280,7 +452,17 @@ struct BrickGenMeshStruct
 				local hb = cuts[i + 1]
 				if (hb - ha) >= MIN_PIECE do
 				(
-					for iv in (G.bandIntervals polys ha hb) do
+					local ivs = G.bandIntervals polys ha hb
+					for k in active do
+					(
+						local e = corners[k]
+						for iv in ivs do
+						(
+							if e[4] > 0 and (abs (iv[2] - e[1])) < 0.5 do iv[2] -= trim
+							if e[4] < 0 and (abs (iv[1] - e[1])) < 0.5 do iv[1] += trim
+						)
+					)
+					for iv in ivs where iv[2] - iv[1] >= MIN_PIECE do
 					(
 						for pc in pieces do
 						(
@@ -315,81 +497,68 @@ struct BrickGenMeshStruct
 	-- Reveals (dagkanten): a strip of bricks depthMm deep along every
 	-- horizontal/vertical edge of every opening (and of the outline when
 	-- includeOuter), facing into the opening. Courses on the jambs use the
-	-- facade's course grid, so the bond runs on round the corner.
+	-- facade's course grid, so the bond runs on round the corner; jamb strips
+	-- leave room for the corner bricks built by the facade (facadeCorners).
 	-- polys / p as for buildRegionInto (p.tm = facade placement).
 	fn buildRevealsInto buf p polys depthMm includeOuter =
 	(
 		if depthMm < MIN_PIECE do return buf
-		local G = BrickGenRegion
 		local T = depthMm
 		local W = 0.0
 		for poly in polys do for pt in poly do if pt.x > W do W = pt.x
 		local strip = 0
-		for pIdx = 1 to polys.count do
+		for e in (revealEdges polys includeOuter) do
 		(
-			local poly = polys[pIdx]
-			local hole = G.isHole polys pIdx
-			if hole or includeOuter do
+			local a = e[2]
+			local b = e[3]
+			local stm = undefined
+			local rect = undefined
+			local corners = #()
+			if e[1] == #jamb then
 			(
-				-- side of the edge the reveal faces: the opening's inside, or
-				-- the outside of the outline
-				local sgn = if (G.signedArea poly) > 0.0 then 1.0 else -1.0
-				if not hole do sgn = -sgn
-				local n = poly.count
-				for i = 1 to n do
+				-- jamb: strip x = depth into the wall, strip z = facade height
+				local ex = 0.5 * (a.x + b.x)
+				local y1 = amin a.y b.y
+				local y2 = amax a.y b.y
+				if e[4] > 0.0 then
 				(
-					local a = poly[i]
-					local b = poly[if i == n then 1 else i + 1]
-					local dx = b.x - a.x
-					local dy = b.y - a.y
-					local nx = -dy * sgn -- normal (left normal * sgn), unnormalised
-					local ny = dx * sgn
-					local stm = undefined
-					local rect = undefined
-					if (abs dx) <= 0.02 * (abs dy) and (abs dy) >= MIN_PIECE then
-					(
-						-- jamb: strip x = depth into the wall, strip z = facade height
-						local ex = 0.5 * (a.x + b.x)
-						local y1 = amin a.y b.y
-						local y2 = amax a.y b.y
-						stm = if nx > 0.0 then
-							matrix3 [0, 1, 0] [-1, 0, 0] [0, 0, 1] [ex, 0, 0]
-						else
-							matrix3 [0, -1, 0] [1, 0, 0] [0, 0, 1] [ex, T, 0]
-						rect = #([0, y1, 0], [T, y1, 0], [T, y2, 0], [0, y2, 0])
-					)
-					else if (abs dy) <= 0.02 * (abs dx) and (abs dx) >= MIN_PIECE do
-					(
-						-- sill (faces up) / head (faces down): strip x = along the
-						-- edge, strip z = depth into the wall
-						local ey = 0.5 * (a.y + b.y)
-						local x1 = amin a.x b.x
-						local x2 = amax a.x b.x
-						if ny > 0.0 then
-						(
-							stm = matrix3 [1, 0, 0] [0, 0, -1] [0, 1, 0] [0, 0, ey]
-							rect = #([x1, 0, 0], [x2, 0, 0], [x2, T, 0], [x1, T, 0])
-						)
-						else
-						(
-							stm = matrix3 [-1, 0, 0] [0, 0, 1] [0, 1, 0] [W, 0, ey]
-							rect = #([W - x2, 0, 0], [W - x1, 0, 0], [W - x1, T, 0], [W - x2, T, 0])
-						)
-					)
-					if stm != undefined do
-					(
-						-- 0.5 mm towards the opening: covers the sawn facade brick ends
-						-- instead of z-fighting with them
-						stm.row4 = stm.row4 - 0.5 * stm.row2
-						strip += 1
-						local q = copy p
-						q.tm = stm * p.tm
-						q.segIndex = p.segIndex + 1000 + strip
-						q.uOffset = 0.0
-						buildRegionInto buf q #(rect)
-					)
+					stm = matrix3 [0, 1, 0] [-1, 0, 0] [0, 0, 1] [ex, 0, 0]
+					corners = #(#(0.0, y1, y2, -1)) -- facade side at strip x = 0
+				)
+				else
+				(
+					stm = matrix3 [0, -1, 0] [1, 0, 0] [0, 0, 1] [ex, T, 0]
+					corners = #(#(T, y1, y2, 1))    -- facade side at strip x = T
+				)
+				rect = #([0, y1, 0], [T, y1, 0], [T, y2, 0], [0, y2, 0])
+			)
+			else
+			(
+				-- sill (faces up) / head (faces down): strip x = along the
+				-- edge, strip z = depth into the wall
+				local ey = 0.5 * (a.y + b.y)
+				local x1 = amin a.x b.x
+				local x2 = amax a.x b.x
+				if e[5] > 0.0 then
+				(
+					stm = matrix3 [1, 0, 0] [0, 0, -1] [0, 1, 0] [0, 0, ey]
+					rect = #([x1, 0, 0], [x2, 0, 0], [x2, T, 0], [x1, T, 0])
+				)
+				else
+				(
+					stm = matrix3 [-1, 0, 0] [0, 0, 1] [0, 1, 0] [W, 0, ey]
+					rect = #([W - x2, 0, 0], [W - x1, 0, 0], [W - x1, T, 0], [W - x2, T, 0])
 				)
 			)
+			-- 0.5 mm towards the opening: covers sawn facade brick ends
+			-- instead of z-fighting with them
+			stm.row4 = stm.row4 - 0.5 * stm.row2
+			strip += 1
+			local q = copy p
+			q.tm = stm * p.tm
+			q.segIndex = p.segIndex + 1000 + strip
+			q.uOffset = 0.0
+			buildRegionInto buf q #(rect) corners:corners cornerMode:#reveal
 		)
 		buf
 	),
