@@ -334,6 +334,8 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 - [ ] Bouwtijd gemeten en gelogd voor 7,5 m² en 200 m².
 
 ### Fase 2 — Atlas-texturering (1 week)
+> Status: gecodeerd, te testen in 3ds Max. `BrickGen_Atlas.ms` (JSON-atlas, cache, cel per steen via RNG-kanaal 3, centrale crop, spiegelen/draaien, kop/strek), `BrickGen_Material.ms` ("Maak materiaal", V-Ray of Physical). Eerste atlas: `presets/atlases/baksteen_rood_01.json` (Vlaams verband, Waalformaat, 340 cellen) automatisch gedetecteerd met `tools/detect_atlas.py` — referentie-algoritme voor de webtool. De textuur zelf staat in de (private) repo voor intern gebruik; niet meeleveren bij verkoop (§15).
+
 - [ ] Atlas-JSON inlezen (`BrickGen_Atlas.ms`). Eenvoudige JSON-parser in MAXScript of via `dotNet` (`System.Web.Script.Serialization` of Newtonsoft als beschikbaar).
 - [ ] UV-kanaal 1 volgens §9, inclusief spiegelen, draaien, afgezaagde stenen en kop/strek-keuze.
 - [ ] Fallback zonder atlas.

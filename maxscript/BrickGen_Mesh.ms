@@ -27,7 +27,9 @@ struct BrickGenWallParams
 	-- placement of this wall piece (set by the modifier per spline segment):
 	tm = undefined,   -- matrix3 wall-local mm -> object space; undefined = scale only
 	uOffset = 0.0,    -- mm along the path before this piece (UV channel 2)
-	segIndex = 0      -- piece number, varies the randomness per segment
+	segIndex = 0,     -- piece number, varies the randomness per segment
+	-- texture atlas (BrickGen_Atlas.ms); undefined = plain 0..1 UV per brick
+	atlas = undefined, atlasFlip = true, atlasRotate = true
 )
 
 struct BrickGenMeshBuffer
@@ -88,8 +90,9 @@ struct BrickGenMeshStruct
 	--
 	-- RNG channels (each gives three values, see BrickGenRNG.u01x3):
 	--   1: size L, size H, chamfer      2: depth, rotation, material ID
+	--   3: atlas cell, flip, rotate 180
 	--   11..18: corner jitter x, z, y for front vertex 1..8
-	fn addBrick buf p idx x0 x1 z0 z1 nomX0 nomL nomZ0 clipL clipR clipT clipB:false =
+	fn addBrick buf p idx x0 x1 z0 z1 nomX0 nomL nomZ0 clipL clipR clipT clipB:false unit:#S =
 	(
 		local R = BrickGenRNG
 		local key = R.brickKey (p.seed + p.segIndex * 7919) idx
@@ -148,6 +151,8 @@ struct BrickGenMeshStruct
 		local invL = 1.0 / nomL
 		local invH = 1.0 / p.brickH
 		local uv1 = for pt in pts collect [(pt.x - nomX0) * invL, (pt.z - nomZ0) * invH, 0.0]
+		if p.atlas != undefined do
+			BrickGenAtlasLib.mapBrick p.atlas uv1 (R.u01x3 key 3) unit (nomL / p.brickH) p.atlasFlip p.atlasRotate
 
 		-- 4. depth jitter
 		if jitter and p.depthJitter > 0.0 do
@@ -323,7 +328,7 @@ struct BrickGenMeshStruct
 							local x1 = amin xb iv[2]
 							if (x1 - x0) >= MIN_PIECE do
 								addBrick buf p (c * 65536 + pc[4]) x0 x1 ha hb xa (xb - xa) z0 \
-									(xa < iv[1]) (xb > iv[2]) (hb < zTop - 0.001) clipB:(ha > z0 + 0.001)
+									(xa < iv[1]) (xb > iv[2]) (hb < zTop - 0.001) clipB:(ha > z0 + 0.001) unit:pc[3]
 						)
 					)
 				)
@@ -449,7 +454,7 @@ struct BrickGenMeshStruct
 					local x0 = amax xa 0.0
 					local x1 = amin xb p.wallLength
 					if (x1 - x0) >= MIN_PIECE do
-						addBrick buf p (c * 65536 + pc[4]) x0 x1 z0 z1 xa (xb - xa) z0 clipL clipR clipT
+						addBrick buf p (c * 65536 + pc[4]) x0 x1 z0 z1 xa (xb - xa) z0 clipL clipR clipT unit:pc[3]
 				)
 			)
 		)

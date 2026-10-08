@@ -18,6 +18,8 @@
 		"BrickGen_Bonds.ms",
 		"BrickGen_UV.ms",
 		"BrickGen_Region.ms",
+		"BrickGen_Atlas.ms",
+		"BrickGen_Material.ms",
 		"BrickGen_Mesh.ms",
 		"BrickGen_Object.ms",
 		"BrickGen_Modifier.ms"

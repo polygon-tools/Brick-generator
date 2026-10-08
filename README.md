@@ -35,6 +35,10 @@ Het laden moet via de startup-map gebeuren: een scène met BrickWall-objecten ka
 5. **Dagkantdiepte** (bv. 30 of 40 cm): langs elke horizontale/verticale rand van een opening komt een strook bakstenen de muur in, met dezelfde laaghoogtes als de gevel. Met **Ook langs de buitenrand** gebeurt dat ook aan de buitenkant van de gevel (hoeken van het gebouw).
 6. **Dagkant offset**: verschuift het verband van de stenen in de zijkanten van de openingen (gemeten vanaf de voorkant van de gevel). Pas aan tot de stenen in de dagkant mooi aansluiten op de gevel; de gevel zelf stel je in met **Startoffset**.
 
+7. **Textuur**: in *Materiaal en textuur* → **Kies atlas...** (bv. `presets/atlases/baksteen_rood_01.json`). Elke steen krijgt een willekeurige steen uit de foto (koppen een kop, afgezaagde stenen een deel), optioneel gespiegeld of 180° gedraaid. Daarna **Maak materiaal**: Multi/Sub-materiaal met V-Ray (of Physical Material zonder V-Ray), ID 1..N = stenen, ID 100 = voeg.
+
+Een atlas maken voor een nieuwe textuur: zolang de webtool (fase 3) er niet is, met `tools/detect_atlas.py textuur.jpg atlas.json --name "..." --L 210 --B 100 --H 50` (Python met numpy en Pillow), of vraag het aan Claude.
+
 Het resultaat wordt gecachet: zolang spline en parameters niet veranderen, wordt de geometrie niet opnieuw berekend.
 
 Beperkingen van deze eerste versie: segmenten worden als rechte lijnen tussen de knooppunten behandeld (bogen nog niet); schuine randen (puntgevel) worden per laag verticaal afgezaagd, in kleine trapjes. De modifier moet rechtstreeks op de Line of Editable Spline staan, niet op een Rectangle; zet die eerst om naar een Editable Spline.
