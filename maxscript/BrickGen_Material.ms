@@ -14,7 +14,15 @@ struct BrickGenMaterialStruct
 		else
 		(
 			local b = Bitmaptexture fileName:f name:(getFilenameFile f)
+			-- the atlas UVs are exact 0..1 image coordinates: no real-world
+			-- scale, no tiling, no offset
+			try (b.coords.realWorldScale = false) catch ()
 			b.coords.mapChannel = ch
+			b.coords.U_Tiling = 1.0
+			b.coords.V_Tiling = 1.0
+			b.coords.U_Offset = 0.0
+			b.coords.V_Offset = 0.0
+			b.coords.blur = 0.2
 			b
 		)
 	),
