@@ -427,7 +427,7 @@ struct BrickGenMeshStruct
 			local pieces = BrickGenBonds.layoutCourse cdef (offsets[c + 1] + p.startOffset) maxX p.headJoint p.brickL p.brickB
 
 			-- corners active in this course (only full-height courses turn a corner)
-			local even = (mod c 2) == 0
+			local even = (mod c 2) == 0 or not bond.cornerAlternate
 			local cw = if even then p.brickL else p.brickB -- along the facade
 			local cd = if even then p.brickB else p.brickL -- into the reveal
 			local trim = (if cornerMode == #facade then cw else cd) + p.headJoint
@@ -452,27 +452,57 @@ struct BrickGenMeshStruct
 				local hb = cuts[i + 1]
 				if (hb - ha) >= MIN_PIECE do
 				(
-					local ivs = G.bandIntervals polys ha hb
+					-- intervals as #(x0, x1, anchoredLeft, anchoredRight)
+					local ivs = for iv in (G.bandIntervals polys ha hb) collect #(iv[1], iv[2], false, false)
 					for k in active do
 					(
 						local e = corners[k]
 						for iv in ivs do
 						(
-							if e[4] > 0 and (abs (iv[2] - e[1])) < 0.5 do iv[2] -= trim
-							if e[4] < 0 and (abs (iv[1] - e[1])) < 0.5 do iv[1] += trim
+							if e[4] > 0 and (abs (iv[2] - e[1])) < 0.5 do ( iv[2] -= trim; iv[4] = true )
+							if e[4] < 0 and (abs (iv[1] - e[1])) < 0.5 do ( iv[1] += trim; iv[3] = true )
 						)
 					)
-					for iv in ivs where iv[2] - iv[1] >= MIN_PIECE do
+					for ivIdx = 1 to ivs.count where ivs[ivIdx][2] - ivs[ivIdx][1] >= MIN_PIECE do
 					(
-						for pc in pieces do
+						local iv = ivs[ivIdx]
+						-- next to a corner the bond is set out from that corner; between
+						-- two corners from both sides, with the closers in the middle
+						local ivPieces = pieces
+						local keyBase = 0
+						if iv[3] or iv[4] do
+						(
+							keyBase = 20000 + ivIdx * 512
+							local h = p.headJoint
+							if iv[3] and iv[4] then
+							(
+								local mid = 0.5 * (iv[1] + iv[2])
+								local lp = for pc in (BrickGenBonds.anchoredCourse cdef iv[1] iv[2] h p.brickL p.brickB true) where pc[2] <= mid collect pc
+								local rp = for pc in (BrickGenBonds.anchoredCourse cdef iv[1] iv[2] h p.brickL p.brickB false) where pc[1] >= mid collect #(pc[1], pc[2], pc[3], pc[4] + 256)
+								local a0 = if lp.count > 0 then lp[lp.count][2] + h else iv[1]
+								local b0 = if rp.count > 0 then rp[rp.count][1] - h else iv[2]
+								ivPieces = lp + rp
+								-- closer(s) in the gap
+								if (b0 - a0) > p.brickL then
+								(
+									local m = 0.5 * (a0 + b0)
+									append ivPieces #(a0, m - 0.5 * h, #S, 500)
+									append ivPieces #(m + 0.5 * h, b0, #S, 501)
+								)
+								else if (b0 - a0) >= MIN_PIECE do append ivPieces #(a0, b0, #S, 500)
+							)
+							else
+								ivPieces = BrickGenBonds.anchoredCourse cdef iv[1] iv[2] h p.brickL p.brickB iv[3]
+						)
+						for pc in ivPieces do
 						(
 							local xa = pc[1]
 							local xb = pc[2]
 							local x0 = amax xa iv[1]
 							local x1 = amin xb iv[2]
 							if (x1 - x0) >= MIN_PIECE do
-								addBrick buf p (c * 65536 + pc[4]) x0 x1 ha hb xa (xb - xa) z0 \
-									(xa < iv[1]) (xb > iv[2]) (hb < zTop - 0.001) clipB:(ha > z0 + 0.001)
+								addBrick buf p (c * 65536 + keyBase + pc[4]) x0 x1 ha hb xa (xb - xa) z0 \
+									(xa < iv[1] - 0.001) (xb > iv[2] + 0.001) (hb < zTop - 0.001) clipB:(ha > z0 + 0.001)
 						)
 					)
 				)
