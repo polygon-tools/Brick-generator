@@ -416,3 +416,4 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 - Hoeken: enkel buitenhoeken of ook binnenhoeken in fase 4?
 - Moet de muur ook een binnenblad/spouw tonen bij openingen (zichtbare dagkant)?
 - Productnaam?
+- **Modifier i.p.v. object?** Workflow op het bureau: spline (vaak getekend op een plan) → Extrude → materiaal. Gevraagd: BrickGen als modifier op een spline, in plaats van een object dat je tekent. Dat trekt "muur volgens een spline" (fase 4) naar voren. Haalbaarheid in MAXScript (`simpleMeshMod` die de spline eronder leest) wordt getest met `testscenes/BrickGen_ProbeModifier.ms`.
