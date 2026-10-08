@@ -9,14 +9,6 @@
 --                  #K  header    (length B, followed by headJoint)
 --                  #KM header on half a stretcher module: pitch (L + headJoint)/2, so
 --                      two headers always line up with one stretcher (kruisverband)
---                  #Q  queen closer (klezoor), (L - B)/2 - headJoint: after a header at
---                      a corner, so the next header is centred on a stretcher
---
--- Corners (next to openings): bond.corners is a cycle of per-course specs
---   #(cornerUnit, prefixUnits, repeatUnits)
--- cornerUnit = what the corner brick shows on the facade (#S or #K; the reveal
--- sees the other one); then prefixUnits once and repeatUnits over and over,
--- set out from the corner. Empty = alternate #S/#K with stretchers (halfsteens).
 --
 -- Adding a bond = adding one BrickGenBonds.register call at the bottom of this file.
 -- The dropdown order is the registration order; never reorder existing bonds,
@@ -27,8 +19,7 @@ struct BrickGenBond
 	id = #none,
 	label = "",
 	courses = #(),
-	wild = false,   -- random offset per course (wild verband)
-	corners = #()   -- corner specs per course, see above
+	wild = false   -- random offset per course (wild verband)
 )
 
 struct BrickGenBondsStruct
@@ -41,67 +32,10 @@ struct BrickGenBondsStruct
 
 	fn get i = ( if i >= 1 and i <= defs.count then defs[i] else defs[1] ),
 
-	fn unitLength u L B hj:12.0 =
-	(
-		case u of
-		(
-			#K: B
-			#KM: B
-			#Q: amax 10.0 (0.5 * (L - B) - hj)
-			default: L
-		)
-	),
+	fn unitLength u L B = ( if u == #K or u == #KM then B else L ),
 
 	-- distance from the start of this unit to the start of the next one
-	fn unitPitch u L B hj = ( if u == #KM then 0.5 * (L + hj) else (unitLength u L B hj:hj) + hj ),
-
-	-- Corner spec #(cornerUnit, prefixUnits, repeatUnits) for course c (0-based).
-	fn cornerSpec bond c =
-	(
-		if bond.corners.count == 0 then
-			(if (mod c 2) == 0 then #(#S, #(), #(#S)) else #(#K, #(), #(#S)))
-		else
-		(
-			local n = bond.corners.count
-			bond.corners[(c - (c / n) * n) + 1]
-		)
-	),
-
-	-- Spec whose corner unit is u (used in the reveal, which sees the other
-	-- face of the corner brick).
-	fn cornerSpecFor bond u =
-	(
-		local found = undefined
-		for i = 0 to (amax 2 bond.corners.count) - 1 while found == undefined do
-		(
-			local s = cornerSpec bond i
-			if s[1] == u do found = s
-		)
-		if found == undefined then #(u, #(), #(#S)) else found
-	),
-
-	-- Units set out from a corner in [x0, x1]: prefix once, then repeat.
-	-- fromLeft: first unit starts at x0; else last unit ends at x1 (mirrored).
-	-- Result #(#(xa, xb, unit, k), ...) like layoutCourse.
-	fn anchoredUnits prefix repeatUnits x0 x1 hj L B fromLeft =
-	(
-		local res = #()
-		local len = x1 - x0
-		local x = 0.0
-		local k = 0
-		local nr = amax 1 repeatUnits.count
-		while x < len and k < 100000 do
-		(
-			local u = if k < prefix.count then prefix[k + 1] \
-				else repeatUnits[(mod (k - prefix.count) nr) as integer + 1]
-			local w = unitLength u L B hj:hj
-			if fromLeft then append res #(x0 + x, x0 + x + w, u, k)
-			else append res #(x1 - x - w, x1 - x, u, k)
-			x += unitPitch u L B hj
-			k += 1
-		)
-		res
-	),
+	fn unitPitch u L B hj = ( if u == #KM then 0.5 * (L + hj) else (unitLength u L B) + hj ),
 
 	fn courseDef bond c = -- c is 0-based
 	(
@@ -201,29 +135,19 @@ BrickGenBonds.register (BrickGenBond id:#stretcher label:"Halfsteens" courses:#(
 ))
 
 -- 2. Staand / stapelverband (stack bond)
-BrickGenBonds.register (BrickGenBond id:#stack label:"Staand (stapel)" corners:#(
-	#(#S, #(), #(#S))
-) courses:#(
+BrickGenBonds.register (BrickGenBond id:#stack label:"Staand (stapel)" courses:#(
 	#([0, 0, 0], #(#S))
 ))
 
 -- 3. Vlaams verband: S-K alternating, headers centred on the stretcher below.
-BrickGenBonds.register (BrickGenBond id:#flemish label:"Vlaams" corners:#(
-	#(#S, #(), #(#K, #S)),
-	#(#K, #(#Q), #(#S, #K))
-) courses:#(
+BrickGenBonds.register (BrickGenBond id:#flemish label:"Vlaams" courses:#(
 	#([0, 0, 0],      #(#S, #K)),
 	#([0.5, -0.5, 0], #(#K, #S))
 ))
 
 -- 4. Kruisverband: stretcher / header courses, every second stretcher course
 --    shifted half a brick; headers centred on the head joints below.
-BrickGenBonds.register (BrickGenBond id:#englishCross label:"Kruisverband" corners:#(
-	#(#S, #(), #(#S)),
-	#(#K, #(#Q), #(#KM)),
-	#(#K, #(), #(#S)),
-	#(#K, #(#Q), #(#KM))
-) courses:#(
+BrickGenBonds.register (BrickGenBond id:#englishCross label:"Kruisverband" courses:#(
 	#([0, 0, 0],      #(#S)),
 	#([1, -0.5, 0.5], #(#KM)),
 	#([0.5, 0, 0.5],  #(#S)),

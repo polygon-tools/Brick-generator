@@ -36,6 +36,7 @@ plugin simpleMeshMod BrickGenMod
 		seed type:#integer ui:spnSeed default:12345
 		revealDepth type:#worldUnits ui:spnReveal default:30.0
 		revealOuter type:#boolean ui:chkRevealOuter default:false
+		revealOffset type:#worldUnits ui:spnRevealOffset default:0.0
 	)
 	rollout rWall "Gevel"
 	(
@@ -45,6 +46,7 @@ plugin simpleMeshMod BrickGenMod
 		on btnNewSeed pressed do seed = random 1 999999
 		spinner spnReveal "Dagkantdiepte:" type:#worldUnits range:[0, 1e6, 30]
 		checkbox chkRevealOuter "Ook langs de buitenrand"
+		spinner spnRevealOffset "Dagkant offset:" type:#worldUnits range:[-1e6, 1e6, 0]
 	)
 
 	-- ----------------------------------------------------------------- Steen
@@ -230,10 +232,9 @@ plugin simpleMeshMod BrickGenMod
 				p.previewMode = previewMode
 				if polys.count > 0 do
 				(
-					-- with reveals, one brick per course turns each jamb corner
-					local corners = if revealDepth / s >= 1.0 then BrickGenMesh.facadeCorners polys revealOuter else #()
-					BrickGenMesh.buildRegionInto buf p polys corners:corners cornerMode:#facade
-					BrickGenMesh.buildRevealsInto buf (copy p) polys (revealDepth / s) revealOuter
+					BrickGenMesh.buildRegionInto buf p polys
+					BrickGenMesh.buildRevealsInto buf (copy p) polys (revealDepth / s) revealOuter \
+						jambOffsetMm:(revealOffset / s)
 				)
 				cacheSig = sig
 				cacheBuf = buf
