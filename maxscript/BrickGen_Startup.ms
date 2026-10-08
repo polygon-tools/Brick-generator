@@ -17,6 +17,7 @@
 		"BrickGen_Presets.ms",
 		"BrickGen_Bonds.ms",
 		"BrickGen_UV.ms",
+		"BrickGen_Region.ms",
 		"BrickGen_Mesh.ms",
 		"BrickGen_Object.ms",
 		"BrickGen_Modifier.ms"

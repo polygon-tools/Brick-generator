@@ -1,35 +1,24 @@
 -- BrickGen_Modifier.ms
--- Scripted modifier "BrickGen": put it directly on a spline (instead of
--- Extrude). Every straight segment becomes a brick wall; the bond runs on
--- along the path, so the pattern continues around corners.
+-- Scripted modifier "BrickGen": put it on a closed spline drawn over a facade
+-- elevation (in the Front/Left/Right/Back view). The whole area inside the
+-- outline is filled with bricks; extra closed splines inside it (windows,
+-- doors) become openings, like Extrude would do.
 --
 -- Conventions:
---   * The spline is the OUTSIDE face of the facade; the wall goes in on the
---     left of the drawing direction. Closed splines drawn counter-clockwise
---     (seen from the top) face outwards; tick "Andere kant" to flip.
---   * Segments are treated as straight lines between the knots (curves later).
---   * Corners: v1 simply ends each segment at the knot; real corner bonding is
---     PLAN.md phase 4.
--- Requires BrickGen_Mesh.ms etc. (BrickGen_Startup.ms loads everything).
+--   * The spline lies in its local XY plane (that is how 3ds Max creates a
+--     shape in any view): local X = along the facade, local Y = up. Bricks
+--     face local +Z (towards the view it was drawn in); "Andere kant" flips.
+--   * Segments are straight lines between the knots (curves later).
+--   * Slanted edges (gables) are sawn per course with a vertical cut (v1).
+-- Requires BrickGen_Region.ms and BrickGen_Mesh.ms (BrickGen_Startup.ms).
 -- Never change classID; never remove or reorder parameters.
 
--- Straight segments of the editable spline at the bottom of the node's stack,
--- in the node's local coordinates (system units): #(#(a, b), ...).
-fn BrickGen_splineSegments node =
+-- All splines of the editable spline at the bottom of the node's stack, as
+-- closed polygons in the node's local coordinates (system units).
+fn BrickGen_splinePolygons node =
 (
-	local segs = #()
-	for s = 1 to (numSplines node) do
-	(
-		local n = numKnots node s
-		local count = if (isClosed node s) then n else n - 1
-		for k = 1 to count do
-		(
-			local a = in coordsys local getKnotPoint node s k
-			local b = in coordsys local getKnotPoint node s (if k == n then 1 else k + 1)
-			append segs #(a, b)
-		)
-	)
-	segs
+	for s = 1 to (numSplines node) collect
+		for k = 1 to (numKnots node s) collect (in coordsys local getKnotPoint node s k)
 )
 
 global BrickGenModWarned = false
@@ -40,16 +29,14 @@ plugin simpleMeshMod BrickGenMod
 	category:"BrickGen"
 	version:1
 (
-	-- ------------------------------------------------------------------ Muur
+	-- ------------------------------------------------------------------ Gevel
 	parameters pWall rollout:rWall
 	(
-		wallHeight type:#worldUnits ui:spnHeight default:250.0
 		flipSide type:#boolean ui:chkFlip default:false
 		seed type:#integer ui:spnSeed default:12345
 	)
-	rollout rWall "Muur"
+	rollout rWall "Gevel"
 	(
-		spinner spnHeight "Hoogte:" type:#worldUnits range:[0, 1e7, 0]
 		checkbox chkFlip "Andere kant (gevel omdraaien)"
 		spinner spnSeed "Seed:" type:#integer range:[0, 999999999, 12345]
 		button btnNewSeed "Nieuwe seed" width:140
@@ -165,11 +152,6 @@ plugin simpleMeshMod BrickGenMod
 		checkbox chkPreview "Snelle preview (geen chamfer/jitter)"
 	)
 
-	on create do
-	(
-		try (wallHeight = units.decodeValue "2500mm") catch ()
-	)
-
 	-- ----------------------------------------------------------------- Build
 	on modifyMesh do
 	(
@@ -181,54 +163,50 @@ plugin simpleMeshMod BrickGenMod
 		(
 			BrickGenModWarned = false
 			local s = units.decodeValue "1mm" -- system units per mm
-			local segs = BrickGen_splineSegments node
-			if flipSide do
-				segs = for i = segs.count to 1 by -1 collect #(segs[i][2], segs[i][1])
-
-			local pathMm = 0.0
-			for i = 1 to segs.count do
+			local raw = BrickGen_splinePolygons node
+			-- bounding box in mm
+			local minX = 1e30
+			local minY = 1e30
+			local maxX = -1e30
+			for poly in raw do for pt in poly do
 			(
-				local a = segs[i][1]
-				local b = segs[i][2]
-				local d = b - a
-				d.z = 0.0
-				local lenMm = (length d) / s
-				if lenMm >= 1.0 do
-				(
-					local X = normalize d
-					local Z = [0.0, 0.0, 1.0]
-					local Y = cross Z X
-					local p = BrickGenWallParams()
-					p.unitScale = s
-					p.tm = matrix3 (X * s) (Y * s) (Z * s) a
-					p.wallLength = lenMm
-					p.wallHeight = wallHeight / s
-					p.uOffset = pathMm
-					p.segIndex = i
-					p.seed = seed
-					p.brickL = brickL
-					p.brickB = brickB
-					p.brickH = brickH
-					p.bedJoint = bedJoint
-					p.headJoint = headJoint
-					p.jointRecess = jointRecess
-					p.mortarEnabled = mortarEnabled
-					p.bondType = bondType
-					-- continue the bond along the path
-					p.startOffset = startOffset - pathMm
-					p.chamfer = chamfer
-					p.chamferJitter = chamferJitter
-					p.cornerJitter = cornerJitter
-					p.depthJitter = depthJitter
-					p.rotJitter = rotJitter
-					p.sizeJitter = sizeJitter
-					p.matIdCount = matIdCount
-					p.mortarMatId = mortarMatId
-					p.previewMode = previewMode
-					BrickGenMesh.buildWallInto buf p
-					pathMm += lenMm
-				)
+				if pt.x / s < minX do minX = pt.x / s
+				if pt.y / s < minY do minY = pt.y / s
+				if pt.x / s > maxX do maxX = pt.x / s
 			)
+			-- to wall mm coordinates: x along (mirrored when flipped), y up
+			local polys = for poly in raw where poly.count >= 3 collect
+				for pt in poly collect
+					[(if flipSide then maxX - pt.x / s else pt.x / s - minX), pt.y / s - minY, 0.0]
+
+			local p = BrickGenWallParams()
+			p.unitScale = s
+			-- wall-local (x along, y depth, z up) mm -> spline-local system units.
+			-- Front faces local +Z, or -Z when flipped.
+			p.tm = if flipSide then
+				matrix3 [-s, 0, 0] [0, 0, s] [0, s, 0] [maxX * s, minY * s, 0]
+			else
+				matrix3 [s, 0, 0] [0, 0, -s] [0, s, 0] [minX * s, minY * s, 0]
+			p.seed = seed
+			p.brickL = brickL
+			p.brickB = brickB
+			p.brickH = brickH
+			p.bedJoint = bedJoint
+			p.headJoint = headJoint
+			p.jointRecess = jointRecess
+			p.mortarEnabled = mortarEnabled
+			p.bondType = bondType
+			p.startOffset = startOffset
+			p.chamfer = chamfer
+			p.chamferJitter = chamferJitter
+			p.cornerJitter = cornerJitter
+			p.depthJitter = depthJitter
+			p.rotJitter = rotJitter
+			p.sizeJitter = sizeJitter
+			p.matIdCount = matIdCount
+			p.mortarMatId = mortarMatId
+			p.previewMode = previewMode
+			if polys.count > 0 do BrickGenMesh.buildRegionInto buf p polys
 		)
 		else if not BrickGenModWarned do
 		(
