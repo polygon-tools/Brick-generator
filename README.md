@@ -33,6 +33,7 @@ Het laden moet via de startup-map gebeuren: een scène met BrickWall-objecten ka
 3. Modify-panel → **Modifier List** → **BrickGen** (in de plaats van Extrude). Het hele vlak wordt baksteen; stenen worden afgezaagd aan alle randen.
 4. De stenen kijken naar het view waarin je tekende. Verkeerde kant: vink **Andere kant** aan.
 5. **Dagkantdiepte** (bv. 30 of 40 cm): langs elke horizontale/verticale rand van een opening komt een strook bakstenen de muur in, met dezelfde laaghoogtes als de gevel. Met **Ook langs de buitenrand** gebeurt dat ook aan de buitenkant van de gevel (hoeken van het gebouw).
+6. **Dagkant offset**: verschuift het verband van de stenen in de zijkanten van de openingen (gemeten vanaf de voorkant van de gevel). Pas aan tot de stenen in de dagkant mooi aansluiten op de gevel; de gevel zelf stel je in met **Startoffset**.
 
 Het resultaat wordt gecachet: zolang spline en parameters niet veranderen, wordt de geometrie niet opnieuw berekend.
 
