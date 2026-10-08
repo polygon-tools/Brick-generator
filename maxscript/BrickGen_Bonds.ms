@@ -19,7 +19,8 @@ struct BrickGenBond
 	id = #none,
 	label = "",
 	courses = #(),
-	wild = false   -- random offset per course (wild verband)
+	wild = false,           -- random offset per course (wild verband)
+	cornerAlternate = true  -- corner bricks alternate stretcher/header per course
 )
 
 struct BrickGenBondsStruct
@@ -96,6 +97,17 @@ struct BrickGenBondsStruct
 		offs
 	),
 
+	-- Lay out one course in [x0, x1] starting with a full unit at x0 (fromLeft)
+	-- or ending with one at x1: the bond is set out from a corner.
+	-- Same result format as layoutCourse.
+	fn anchoredCourse cdef x0 x1 hj L B fromLeft =
+	(
+		local len = x1 - x0
+		for pc in (layoutCourse cdef 0.0 len hj L B) collect
+			if fromLeft then #(x0 + pc[1], x0 + pc[2], pc[3], pc[4])
+			else #(x1 - pc[2], x1 - pc[1], pc[3], pc[4])
+	),
+
 	-- Lay out one course along [0, wallLen].
 	-- Returns #(xStart, xEnd, unit, k) per unit that touches the wall; xStart/xEnd
 	-- are the unclipped positions, k is the stable index of the unit in the course.
@@ -135,7 +147,7 @@ BrickGenBonds.register (BrickGenBond id:#stretcher label:"Halfsteens" courses:#(
 ))
 
 -- 2. Staand / stapelverband (stack bond)
-BrickGenBonds.register (BrickGenBond id:#stack label:"Staand (stapel)" courses:#(
+BrickGenBonds.register (BrickGenBond id:#stack label:"Staand (stapel)" cornerAlternate:false courses:#(
 	#([0, 0, 0], #(#S))
 ))
 
