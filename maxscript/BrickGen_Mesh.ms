@@ -23,7 +23,11 @@ struct BrickGenWallParams
 	rotJitter = 0.3, sizeJitter = 1.0,
 	matIdCount = 5, mortarMatId = 100,
 	previewMode = false,
-	unitScale = 1.0 -- system units per mm
+	unitScale = 1.0, -- system units per mm
+	-- placement of this wall piece (set by the modifier per spline segment):
+	tm = undefined,   -- matrix3 wall-local mm -> object space; undefined = scale only
+	uOffset = 0.0,    -- mm along the path before this piece (UV channel 2)
+	segIndex = 0      -- piece number, varies the randomness per segment
 )
 
 struct BrickGenMeshBuffer
@@ -88,7 +92,7 @@ struct BrickGenMeshStruct
 	fn addBrick buf p idx x0 x1 z0 z1 nomX0 nomL nomZ0 clipL clipR clipT =
 	(
 		local R = BrickGenRNG
-		local key = R.brickKey p.seed idx
+		local key = R.brickKey (p.seed + p.segIndex * 7919) idx
 		local jitter = not p.previewMode
 		local r1 = if jitter then R.sym3 key 1 else [0.0, 0.0, 0.0]
 		local r2 = R.u01x3 key 2
@@ -170,13 +174,14 @@ struct BrickGenMeshStruct
 		local mat = amin n (1 + ((floor (r2.z * n)) as integer))
 
 		local base = buf.verts.count
-		local s = p.unitScale
+		local tm = p.tm
+		local u0 = p.uOffset
 		for i = 1 to 12 do
 		(
 			local pt = pts[i]
-			append buf.verts (pt * s)
+			append buf.verts (pt * tm)
 			append buf.uv1 uv1[i]
-			append buf.uv2 [pt.x * 0.001, pt.z * 0.001, 0.0]
+			append buf.uv2 [(pt.x + u0) * 0.001, pt.z * 0.001, 0.0]
 		)
 
 		local bv = [base, base, base]
@@ -198,17 +203,20 @@ struct BrickGenMeshStruct
 		local base = buf.verts.count
 		for pt in pts do
 		(
-			append buf.verts (pt * p.unitScale)
-			append buf.uv1 (BrickGenUV.planarUV pt.x pt.z)
-			append buf.uv2 (BrickGenUV.planarUV pt.x pt.z)
+			local uv = BrickGenUV.planarUV (pt.x + p.uOffset) pt.z
+			append buf.verts (pt * p.tm)
+			append buf.uv1 uv
+			append buf.uv2 uv
 		)
 		addQuad buf (base + 1) (base + 2) (base + 3) (base + 4) SG_MORTAR p.mortarMatId
 	),
 
-	fn buildWall p =
+	-- Appends one straight wall piece (p.wallLength x p.wallHeight, placed by
+	-- p.tm) to buf. Used for the BrickWall object and per spline segment.
+	fn buildWallInto buf p =
 	(
-		local buf = BrickGenMeshBuffer()
 		if BRICK_FACES.count != 18 do initBrickTemplate()
+		if p.tm == undefined do p.tm = scaleMatrix [p.unitScale, p.unitScale, p.unitScale]
 		p.brickL = amax 1.0 p.brickL
 		p.brickB = amax 1.0 p.brickB
 		p.brickH = amax 1.0 p.brickH
@@ -247,6 +255,8 @@ struct BrickGenMeshStruct
 		if p.mortarEnabled do addMortar buf p
 		buf
 	),
+
+	fn buildWall p = ( buildWallInto (BrickGenMeshBuffer()) p ),
 
 	-- Write the buffer into a TriMesh (the `mesh` of a simpleObject).
 	-- Returns timings in ms: #(setMesh, smoothing+edges, uv).

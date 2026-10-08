@@ -18,7 +18,8 @@
 		"BrickGen_Bonds.ms",
 		"BrickGen_UV.ms",
 		"BrickGen_Mesh.ms",
-		"BrickGen_Object.ms"
+		"BrickGen_Object.ms",
+		"BrickGen_Modifier.ms"
 	) do fileIn (dir + f)
 
 	::BrickGenFormats.load (pathConfig.appendPath BrickGenRoot "presets\\formats.json")

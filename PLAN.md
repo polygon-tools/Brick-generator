@@ -44,7 +44,8 @@ brickgen/
 ├── CLAUDE.md                ← korte werkinstructies voor Claude Code (verwijst naar PLAN.md)
 ├── README.md                ← installatie en gebruik voor collega's
 ├── maxscript/
-│   ├── BrickGen_Object.ms   ← scripted plugin (simpleObject) — de muur zelf
+│   ├── BrickGen_Object.ms   ← scripted plugin (simpleObject) — losse rechte muur
+│   ├── BrickGen_Modifier.ms ← scripted modifier (simpleMeshMod) — muur langs een spline
 │   ├── BrickGen_Bonds.ms    ← verbanddefinities (data + functies)
 │   ├── BrickGen_Mesh.ms     ← geometrie-opbouw (steen, voeg, chamfer, jitter)
 │   ├── BrickGen_UV.ms       ← atlas-UV's en extra UV-kanalen
@@ -416,4 +417,4 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 - Hoeken: enkel buitenhoeken of ook binnenhoeken in fase 4?
 - Moet de muur ook een binnenblad/spouw tonen bij openingen (zichtbare dagkant)?
 - Productnaam?
-- **Modifier i.p.v. object?** Workflow op het bureau: spline (vaak getekend op een plan) → Extrude → materiaal. Gevraagd: BrickGen als modifier op een spline, in plaats van een object dat je tekent. Dat trekt "muur volgens een spline" (fase 4) naar voren. Haalbaarheid in MAXScript (`simpleMeshMod` die de spline eronder leest) wordt getest met `testscenes/BrickGen_ProbeModifier.ms`.
+- ~~Modifier i.p.v. object?~~ **Beslist:** BrickGen wordt vooral als **modifier op een spline** gebruikt (workflow: spline → BrickGen, in plaats van spline → Extrude). Haalbaarheid bevestigd in 3ds Max 2026 met `testscenes/BrickGen_ProbeModifier.ms` (`simpleMeshMod` leest de spline onder zich). Eerste versie in `BrickGen_Modifier.ms`: rechte segmenten, verband loopt door langs het pad, nog geen hoekverband. Het `BrickWall`-object blijft bestaan voor losse testmuren.

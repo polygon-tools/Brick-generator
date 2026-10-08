@@ -27,6 +27,16 @@ Het laden moet via de startup-map gebeuren: een scène met BrickWall-objecten ka
 
 ## Gebruik
 
+### Als modifier op een spline (aanbevolen)
+1. Teken een **Line** of **Editable Spline** (bv. de buitenkant van de gevel, over een plan).
+2. Modify-panel → **Modifier List** → **BrickGen** (in de plaats van Extrude).
+3. Stel de **Hoogte** in. Elk recht segment wordt een muur; het verband loopt door over de hoeken.
+4. De spline is de **buitenkant** van de gevel. Staan de stenen aan de verkeerde kant: vink **Andere kant** aan.
+
+Beperkingen van deze eerste versie: segmenten worden als rechte lijnen tussen de knooppunten behandeld (bogen nog niet). Hoeken krijgen nog geen echt hoekverband (fase 4). De modifier moet rechtstreeks op de Line of Editable Spline staan, niet op een Rectangle of Circle; zet die eerst om naar een Editable Spline.
+
+### Als losse muur (object)
+
 - **Create-panel → Geometry → BrickGen → BrickWall.** Klik het startpunt aan, sleep voor de lengte, beweeg de muis voor de hoogte en klik om te bevestigen.
 - Of via een knop: *Customize → Customize User Interface → categorie "BrickGen" → BrickWall*.
 - De voorkant van de muur kijkt naar **−Y** (in het top-view: naar onder). Het draaipunt ligt linksonder aan de voorkant.
