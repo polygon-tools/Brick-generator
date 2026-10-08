@@ -84,12 +84,12 @@ struct BrickGenMeshStruct
 
 	-- x0..x1 / z0..z1: (clipped) brick extent in mm.
 	-- nomX0 / nomL: unclipped start and length (for UVs).
-	-- clipL / clipR / clipT: that edge is sawn at the wall boundary.
+	-- clipL / clipR / clipT / clipB: that edge is sawn (wall edge or opening).
 	--
 	-- RNG channels (each gives three values, see BrickGenRNG.u01x3):
 	--   1: size L, size H, chamfer      2: depth, rotation, material ID
 	--   11..18: corner jitter x, z, y for front vertex 1..8
-	fn addBrick buf p idx x0 x1 z0 z1 nomX0 nomL nomZ0 clipL clipR clipT =
+	fn addBrick buf p idx x0 x1 z0 z1 nomX0 nomL nomZ0 clipL clipR clipT clipB:false =
 	(
 		local R = BrickGenRNG
 		local key = R.brickKey (p.seed + p.segIndex * 7919) idx
@@ -104,7 +104,7 @@ struct BrickGenMeshStruct
 			local dH = 0.5 * p.sizeJitter * r1.y
 			if not clipL do x0 -= dL
 			if not clipR do x1 += dL
-			z0 = amax 0.0 (z0 - dH)
+			if not clipB do z0 = amax 0.0 (z0 - dH)
 			if not clipT do z1 += dH
 		)
 
@@ -117,10 +117,11 @@ struct BrickGenMeshStruct
 		local cL = if clipL then 0.0 else c
 		local cR = if clipR then 0.0 else c
 		local cT = if clipT then 0.0 else c
+		local cB = if clipB then 0.0 else c
 		local depth = p.jointRecess + c + 3.0 + p.depthJitter
 
 		local pts = #(
-			[x0 + cL, 0.0, z0 + c], [x1 - cR, 0.0, z0 + c], [x1 - cR, 0.0, z1 - cT], [x0 + cL, 0.0, z1 - cT],
+			[x0 + cL, 0.0, z0 + cB], [x1 - cR, 0.0, z0 + cB], [x1 - cR, 0.0, z1 - cT], [x0 + cL, 0.0, z1 - cT],
 			[x0, c, z0], [x1, c, z0], [x1, c, z1], [x0, c, z1]
 		)
 
@@ -134,8 +135,9 @@ struct BrickGenMeshStruct
 				local onLeft = (k == 1 or k == 4)
 				local onTop = (k == 3 or k == 4)
 				local sawnX = if onLeft then clipL else clipR
+				local sawnZ = if onTop then clipT else clipB
 				local j = R.sym3 key (10 + v)
-				pts[v] = pts[v] + [(if sawnX then 0.0 else cj * j.x), 0.3 * cj * j.z, (if onTop and clipT then 0.0 else cj * j.y)]
+				pts[v] = pts[v] + [(if sawnX then 0.0 else cj * j.x), 0.3 * cj * j.z, (if sawnZ then 0.0 else cj * j.y)]
 			)
 		)
 
@@ -155,7 +157,7 @@ struct BrickGenMeshStruct
 		)
 
 		-- 5. rotation around Y through the brick centre (not for sawn bricks)
-		if jitter and p.rotJitter > 0.0 and not (clipL or clipR or clipT) do
+		if jitter and p.rotJitter > 0.0 and not (clipL or clipR or clipT or clipB) do
 		(
 			local a = p.rotJitter * (2.0 * r2.y - 1.0)
 			local ca = cos a
@@ -211,9 +213,7 @@ struct BrickGenMeshStruct
 		addQuad buf (base + 1) (base + 2) (base + 3) (base + 4) SG_MORTAR p.mortarMatId
 	),
 
-	-- Appends one straight wall piece (p.wallLength x p.wallHeight, placed by
-	-- p.tm) to buf. Used for the BrickWall object and per spline segment.
-	fn buildWallInto buf p =
+	fn sanitize p =
 	(
 		if BRICK_FACES.count != 18 do initBrickTemplate()
 		if p.tm == undefined do p.tm = scaleMatrix [p.unitScale, p.unitScale, p.unitScale]
@@ -222,6 +222,101 @@ struct BrickGenMeshStruct
 		p.brickH = amax 1.0 p.brickH
 		p.bedJoint = amax 0.0 p.bedJoint
 		p.headJoint = amax 0.0 p.headJoint
+		p
+	),
+
+	-- Mortar rectangle [x0, x1] x [za, zb] at the joint recess.
+	fn addMortarRect buf p x0 x1 za zb =
+	(
+		local y = p.jointRecess
+		local base = buf.verts.count
+		for pt in #([x0, y, za], [x1, y, za], [x1, y, zb], [x0, y, zb]) do
+		(
+			local uv = BrickGenUV.planarUV (pt.x + p.uOffset) pt.z
+			append buf.verts (pt * p.tm)
+			append buf.uv1 uv
+			append buf.uv2 uv
+		)
+		addQuad buf (base + 1) (base + 2) (base + 3) (base + 4) SG_MORTAR p.mortarMatId
+	),
+
+	-- Fills a region (closed polygons in wall mm, x along, y up, bounding box
+	-- starting at 0,0; inner polygons are openings) with bricks, placed by p.tm.
+	-- Per course the band is cut at polygon vertex heights; each piece is
+	-- clipped to the inside intervals, so bricks are sawn at every edge.
+	fn buildRegionInto buf p polys =
+	(
+		sanitize p
+		local G = BrickGenRegion
+		local maxX = 0.0
+		local maxY = 0.0
+		for poly in polys do for pt in poly do
+		(
+			if pt.x > maxX do maxX = pt.x
+			if pt.y > maxY do maxY = pt.y
+		)
+		if maxX < MIN_PIECE or maxY < MIN_PIECE do return buf
+		p.wallLength = maxX
+		p.wallHeight = maxY
+
+		local ys = G.vertexHeights polys
+		local bond = BrickGenBonds.get p.bondType
+		local pitchZ = p.brickH + p.bedJoint
+		local nCourses = (ceil (maxY / pitchZ)) as integer
+		local offsets = BrickGenBonds.courseOffsets bond nCourses p.seed p.brickL p.brickB p.headJoint p.wildMinOverlap
+
+		for c = 0 to nCourses - 1 do
+		(
+			local z0 = c * pitchZ
+			local zTop = z0 + p.brickH
+			local cdef = BrickGenBonds.courseDef bond c
+			local pieces = BrickGenBonds.layoutCourse cdef (offsets[c + 1] + p.startOffset) maxX p.headJoint p.brickL p.brickB
+
+			-- bricks
+			local cuts = G.bandCuts ys z0 (amin zTop maxY)
+			for i = 1 to cuts.count - 1 do
+			(
+				local ha = cuts[i]
+				local hb = cuts[i + 1]
+				if (hb - ha) >= MIN_PIECE do
+				(
+					for iv in (G.bandIntervals polys ha hb) do
+					(
+						for pc in pieces do
+						(
+							local xa = pc[1]
+							local xb = pc[2]
+							local x0 = amax xa iv[1]
+							local x1 = amin xb iv[2]
+							if (x1 - x0) >= MIN_PIECE do
+								addBrick buf p (c * 65536 + pc[4]) x0 x1 ha hb xa (xb - xa) z0 \
+									(xa < iv[1]) (xb > iv[2]) (hb < zTop - 0.001) clipB:(ha > z0 + 0.001)
+						)
+					)
+				)
+			)
+
+			-- mortar behind this course and its bed joint
+			if p.mortarEnabled do
+			(
+				local mcuts = G.bandCuts ys z0 (amin (z0 + pitchZ) maxY)
+				for i = 1 to mcuts.count - 1 do
+				(
+					local ha = mcuts[i]
+					local hb = mcuts[i + 1]
+					if (hb - ha) > 0.01 do
+						for iv in (G.bandIntervals polys ha hb) do addMortarRect buf p iv[1] iv[2] ha hb
+				)
+			)
+		)
+		buf
+	),
+
+	-- Appends one straight wall piece (p.wallLength x p.wallHeight, placed by
+	-- p.tm) to buf. Used for the BrickWall object and per spline segment.
+	fn buildWallInto buf p =
+	(
+		sanitize p
 		if p.wallLength < MIN_PIECE or p.wallHeight < MIN_PIECE do return buf
 
 		local bond = BrickGenBonds.get p.bondType

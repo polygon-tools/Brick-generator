@@ -27,13 +27,13 @@ Het laden moet via de startup-map gebeuren: een scène met BrickWall-objecten ka
 
 ## Gebruik
 
-### Als modifier op een spline (aanbevolen)
-1. Teken een **Line** of **Editable Spline** (bv. de buitenkant van de gevel, over een plan).
-2. Modify-panel → **Modifier List** → **BrickGen** (in de plaats van Extrude).
-3. Stel de **Hoogte** in. Elk recht segment wordt een muur; het verband loopt door over de hoeken.
-4. De spline is de **buitenkant** van de gevel. Staan de stenen aan de verkeerde kant: vink **Andere kant** aan.
+### Als modifier op een gevel-spline (aanbevolen)
+1. Plaats het gevelplan en teken in het **Front-, Back-, Left- of Right-view** de omtrek van de gevel als gesloten **Line** / **Editable Spline**.
+2. Ramen en deuren: teken ze als extra gesloten splines **in hetzelfde object** (Attach). Ze worden openingen, zoals bij Extrude.
+3. Modify-panel → **Modifier List** → **BrickGen** (in de plaats van Extrude). Het hele vlak wordt baksteen; stenen worden afgezaagd aan alle randen.
+4. De stenen kijken naar het view waarin je tekende. Verkeerde kant: vink **Andere kant** aan.
 
-Beperkingen van deze eerste versie: segmenten worden als rechte lijnen tussen de knooppunten behandeld (bogen nog niet). Hoeken krijgen nog geen echt hoekverband (fase 4). De modifier moet rechtstreeks op de Line of Editable Spline staan, niet op een Rectangle of Circle; zet die eerst om naar een Editable Spline.
+Beperkingen van deze eerste versie: segmenten worden als rechte lijnen tussen de knooppunten behandeld (bogen nog niet); schuine randen (puntgevel) worden per laag verticaal afgezaagd, in kleine trapjes. De modifier moet rechtstreeks op de Line of Editable Spline staan, niet op een Rectangle; zet die eerst om naar een Editable Spline.
 
 ### Als losse muur (object)
 
