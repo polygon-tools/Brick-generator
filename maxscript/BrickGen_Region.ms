@@ -57,6 +57,44 @@ struct BrickGenRegionStruct
 		sort (makeUniqueArray ys)
 	),
 
+	-- Signed area (> 0 = counter-clockwise, y up).
+	fn signedArea poly =
+	(
+		local a = 0.0
+		local n = poly.count
+		for i = 1 to n do
+		(
+			local p = poly[i]
+			local q = poly[if i == n then 1 else i + 1]
+			a += p.x * q.y - q.x * p.y
+		)
+		0.5 * a
+	),
+
+	-- Even-odd point-in-polygon test.
+	fn insidePoly poly pt =
+	(
+		local inside = false
+		local n = poly.count
+		for i = 1 to n do
+		(
+			local a = poly[i]
+			local b = poly[if i == n then 1 else i + 1]
+			if ((a.y > pt.y) != (b.y > pt.y)) and \
+				(pt.x < a.x + (pt.y - a.y) * (b.x - a.x) / (b.y - a.y)) do inside = not inside
+		)
+		inside
+	),
+
+	-- A polygon is an opening when it lies inside an odd number of the others.
+	fn isHole polys i =
+	(
+		local cnt = 0
+		local pt = polys[i][1]
+		for j = 1 to polys.count where j != i do if (insidePoly polys[j] pt) do cnt += 1
+		(mod cnt 2) == 1
+	),
+
 	-- Cut heights for a band: ha, every vertex height strictly inside, hb.
 	fn bandCuts ys ha hb =
 	(

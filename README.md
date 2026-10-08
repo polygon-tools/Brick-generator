@@ -32,6 +32,9 @@ Het laden moet via de startup-map gebeuren: een scène met BrickWall-objecten ka
 2. Ramen en deuren: teken ze als extra gesloten splines **in hetzelfde object** (Attach). Ze worden openingen, zoals bij Extrude.
 3. Modify-panel → **Modifier List** → **BrickGen** (in de plaats van Extrude). Het hele vlak wordt baksteen; stenen worden afgezaagd aan alle randen.
 4. De stenen kijken naar het view waarin je tekende. Verkeerde kant: vink **Andere kant** aan.
+5. **Dagkantdiepte** (bv. 30 of 40 cm): langs elke horizontale/verticale rand van een opening komt een strook bakstenen de muur in, met dezelfde laaghoogtes als de gevel. Met **Ook langs de buitenrand** gebeurt dat ook aan de buitenkant van de gevel (hoeken van het gebouw).
+
+Het resultaat wordt gecachet: zolang spline en parameters niet veranderen, wordt de geometrie niet opnieuw berekend.
 
 Beperkingen van deze eerste versie: segmenten worden als rechte lijnen tussen de knooppunten behandeld (bogen nog niet); schuine randen (puntgevel) worden per laag verticaal afgezaagd, in kleine trapjes. De modifier moet rechtstreeks op de Line of Editable Spline staan, niet op een Rectangle; zet die eerst om naar een Editable Spline.
 
