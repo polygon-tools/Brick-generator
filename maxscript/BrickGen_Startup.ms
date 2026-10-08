@@ -21,8 +21,8 @@
 		"BrickGen_Object.ms"
 	) do fileIn (dir + f)
 
-	BrickGenFormats.load (pathConfig.appendPath BrickGenRoot "presets\\formats.json")
-	format "BrickGen geladen uit %\n" BrickGenRoot
+	::BrickGenFormats.load (pathConfig.appendPath BrickGenRoot "presets\\formats.json")
+	format "BrickGen geladen uit %\n" ::BrickGenRoot
 )
 
 macroScript BrickGen_CreateWall
