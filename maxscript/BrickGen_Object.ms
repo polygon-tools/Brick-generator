@@ -6,7 +6,7 @@
 -- Never change classID; scenes use it to find the plugin.
 -- Never remove or reorder parameters; add new ones at the end of a block.
 
-struct BrickGenSettingsStruct ( logTiming = false, slowBuildMs = 500, lastBuildMs = 0, lastTris = 0 )
+struct BrickGenSettingsStruct ( logTiming = false, slowBuildMs = 500, lastBuildMs = 0, lastTris = 0, lastPhases = #() )
 global BrickGenSettings = BrickGenSettingsStruct()
 
 plugin simpleObject BrickWall
@@ -170,14 +170,17 @@ plugin simpleObject BrickWall
 		p.previewMode = previewMode
 
 		local buf = BrickGenMesh.buildWall p
-		BrickGenMesh.applyToMesh mesh buf
+		local tGeo = timeStamp() - t0
+		local tApply = BrickGenMesh.applyToMesh mesh buf
 
 		local ms = timeStamp() - t0
 		BrickGenSettings.lastBuildMs = ms
 		BrickGenSettings.lastTris = buf.faces.count
+		BrickGenSettings.lastPhases = #(tGeo) + tApply
 		if BrickGenSettings.logTiming or ms > BrickGenSettings.slowBuildMs do
-			format "BrickGen: % x % mm, % stenen, % tris, % ms\n" \
-				(p.wallLength as integer) (p.wallHeight as integer) buf.brickCount buf.faces.count ms
+			format "BrickGen: % x % mm, % stenen, % tris, % ms (geometrie %, setMesh %, smoothing %, uv %)\n" \
+				(p.wallLength as integer) (p.wallHeight as integer) buf.brickCount buf.faces.count ms \
+				tGeo tApply[1] tApply[2] tApply[3]
 	)
 
 	on create do

@@ -95,6 +95,7 @@ brickgen/
 - Alle maten in mm, omzetten bij het bouwen.
 - Alle randomisatie via een **eigen seed-RNG** (`BrickGen_RNG.ms`), nooit via de globale `random` zonder seed. Zelfde parameters + zelfde seed = exact dezelfde muur.
 - Elke steen krijgt een eigen index `i`; random waarden worden afgeleid van `hash(seed, i, kanaal)` zodat het toevoegen van een nieuwe random-parameter de bestaande willekeur niet verschuift.
+  Implementatie: één hash per kanaal levert drie waarden (10/10/11 bits, `BrickGenRNG.u01x3`). Kanaalindeling staat bij `addBrick` in `BrickGen_Mesh.ms`.
 
 ---
 
@@ -317,7 +318,7 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 - [ ] Testscène `testscenes/test_gevel.max`: camera, licht, een vlak waar de muur komt. Script staat klaar (`BrickGen_MakeTestScene.ms`); het .max-bestand moet nog in 3ds Max aangemaakt en gecommit worden.
 
 ### Fase 1 — MVP rechte muur (1–2 weken)
-> Status: gecodeerd, nog niet getest in 3ds Max. Draai `testscenes/BrickGen_Tests.ms` en vink af op basis van de Listener-output.
+> Status (3ds Max 2026): alle functionele tests slagen. Eerste meting: 7,5 m² in 305 ms, 200 m² in 8,3 s (doel 0,2 s / 3 s). Optimalisatieronde 1 loopt (minder RNG-aanroepen, autoEdge, timing per fase).
 
 - [ ] Scripted plugin `BrickWall` verschijnt in Create-panel en is te tekenen met muis (lengte, dan hoogte).
 - [ ] Parameters uit §6 (Muur, Steen, Voeg, Verband, Vorm/imperfectie, matIdCount, mortarMatId) werken.
