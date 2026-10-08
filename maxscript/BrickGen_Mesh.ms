@@ -426,10 +426,14 @@ struct BrickGenMeshStruct
 			local cdef = BrickGenBonds.courseDef bond c
 			local pieces = BrickGenBonds.layoutCourse cdef (offsets[c + 1] + p.startOffset) maxX p.headJoint p.brickL p.brickB
 
-			-- corners active in this course (only full-height courses turn a corner)
-			local even = (mod c 2) == 0 or not bond.cornerAlternate
-			local cw = if even then p.brickL else p.brickB -- along the facade
-			local cd = if even then p.brickB else p.brickL -- into the reveal
+			-- corners active in this course (only full-height courses turn a corner).
+			-- The bond's corner spec says what the corner brick shows on the
+			-- facade (the reveal sees the other face) and how to continue.
+			local spec = BrickGenBonds.cornerSpec bond c
+			local ruUnit = if spec[1] == #S then #K else #S
+			local cw = BrickGenBonds.unitLength spec[1] p.brickL p.brickB -- along the facade
+			local cd = BrickGenBonds.unitLength ruUnit p.brickL p.brickB  -- into the reveal
+			local lay = if cornerMode == #facade then spec else (BrickGenBonds.cornerSpecFor bond ruUnit)
 			local trim = (if cornerMode == #facade then cw else cd) + p.headJoint
 			local active = for k = 1 to corners.count where \
 				corners[k][2] <= z0 + 0.5 and zTop <= corners[k][3] + 0.5 and zTop <= maxY collect k
@@ -467,7 +471,8 @@ struct BrickGenMeshStruct
 					(
 						local iv = ivs[ivIdx]
 						-- next to a corner the bond is set out from that corner; between
-						-- two corners from both sides, with the closers in the middle
+						-- two corners (a pier) from both sides, with the closers at a
+						-- random spot in the middle third so they do not stack up
 						local ivPieces = pieces
 						local keyBase = 0
 						if iv[3] or iv[4] do
@@ -476,9 +481,10 @@ struct BrickGenMeshStruct
 							local h = p.headJoint
 							if iv[3] and iv[4] then
 							(
-								local mid = 0.5 * (iv[1] + iv[2])
-								local lp = for pc in (BrickGenBonds.anchoredCourse cdef iv[1] iv[2] h p.brickL p.brickB true) where pc[2] <= mid collect pc
-								local rp = for pc in (BrickGenBonds.anchoredCourse cdef iv[1] iv[2] h p.brickL p.brickB false) where pc[1] >= mid collect #(pc[1], pc[2], pc[3], pc[4] + 256)
+								local rk = BrickGenRNG.brickKey (p.seed + p.segIndex * 7919 + 31) (c * 1024 + ivIdx)
+								local mid = 0.5 * (iv[1] + iv[2]) + ((BrickGenRNG.u01 rk 1) - 0.5) * (iv[2] - iv[1]) / 3.0
+								local lp = for pc in (BrickGenBonds.anchoredUnits lay[2] lay[3] iv[1] iv[2] h p.brickL p.brickB true) where pc[2] <= mid collect pc
+								local rp = for pc in (BrickGenBonds.anchoredUnits lay[2] lay[3] iv[1] iv[2] h p.brickL p.brickB false) where pc[1] >= mid collect #(pc[1], pc[2], pc[3], pc[4] + 256)
 								local a0 = if lp.count > 0 then lp[lp.count][2] + h else iv[1]
 								local b0 = if rp.count > 0 then rp[rp.count][1] - h else iv[2]
 								ivPieces = lp + rp
@@ -492,7 +498,7 @@ struct BrickGenMeshStruct
 								else if (b0 - a0) >= MIN_PIECE do append ivPieces #(a0, b0, #S, 500)
 							)
 							else
-								ivPieces = BrickGenBonds.anchoredCourse cdef iv[1] iv[2] h p.brickL p.brickB iv[3]
+								ivPieces = BrickGenBonds.anchoredUnits lay[2] lay[3] iv[1] iv[2] h p.brickL p.brickB iv[3]
 						)
 						for pc in ivPieces do
 						(
