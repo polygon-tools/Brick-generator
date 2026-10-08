@@ -10,3 +10,8 @@ Kort:
 - `BrickWall`: `classID` nooit wijzigen. Parameters nooit verwijderen of herschikken, enkel achteraan toevoegen (scènes slaan ze op). Zo ook voor de volgorde van de verbanden in `BrickGen_Bonds.ms` (de index wordt opgeslagen).
 - Laadvolgorde staat in `maxscript/BrickGen_Startup.ms`. Een nieuw bestand moet daar ook bij.
 - Kleine commits per afgewerkt onderdeel. Werk PLAN.md bij als een beslissing verandert.
+- MAXScript-valkuilen (getest in 3ds Max 2026):
+  - In een struct kan een functie enkel functies aanroepen die **eerder** in de struct staan (anders: "Call needs function or class, got: undefined").
+  - In een top-level blok `( ... )` worden globals die pas tijdens dat blok via `fileIn` ontstaan als lokaal gezien: gebruik `::Naam`.
+  - Een nieuwe TriMesh heeft enkel map channel 0 en 1: `meshop.setNumMaps` vóór kanaal 2+.
+  - `pi` is een constante: niet als variabelenaam gebruiken.
