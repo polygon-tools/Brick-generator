@@ -30,7 +30,8 @@ struct BrickGenWallParams
 	segIndex = 0,     -- piece number, varies the randomness per segment
 	-- texture atlas (BrickGen_Atlas.ms); undefined = plain 0..1 UV per brick
 	atlas = undefined, atlasFlip = true, atlasRotate = true,
-	bondOverride = undefined -- a BrickGenBond used instead of bondType (reveal strips)
+	bondOverride = undefined, -- a BrickGenBond used instead of bondType (reveal strips)
+	chipChance = 0.0, chipSize = 6.0 -- broken corners: fraction of bricks, size in mm
 )
 
 struct BrickGenMeshBuffer
@@ -91,7 +92,7 @@ struct BrickGenMeshStruct
 	--
 	-- RNG channels (each gives three values, see BrickGenRNG.u01x3):
 	--   1: size L, size H, chamfer      2: depth, rotation, material ID
-	--   3: atlas cell, flip, rotate 180
+	--   3: atlas cell, flip, rotate 180    4: broken corner chance, which, size
 	--   11..18: corner jitter x, z, y for front vertex 1..8
 	fn addBrick buf p idx x0 x1 z0 z1 nomX0 nomL nomZ0 clipL clipR clipT clipB:false unit:#S =
 	(
@@ -147,6 +148,30 @@ struct BrickGenMeshStruct
 
 		-- back vertices follow the outer rim
 		for v = 5 to 8 do append pts [pts[v].x, depth, pts[v].z]
+
+		-- 3b. broken corner (RNG channel 4: chance, which corner, size): the
+		-- front and rim vertex of one free corner move inwards and back, so
+		-- a piece seems knocked off. Back vertices stay: no extra geometry.
+		if jitter and p.chipChance > 0.0 and p.chipSize > 0.0 do
+		(
+			local r4 = R.u01x3 key 4
+			if r4.x < p.chipChance do
+			(
+				local k = 1 + ((floor (r4.y * 4.0)) as integer)
+				if k > 4 do k = 4
+				local onLeft = (k == 1 or k == 4)
+				local onTop = (k == 3 or k == 4)
+				local sawn = (if onLeft then clipL else clipR) or (if onTop then clipT else clipB)
+				if not sawn do
+				(
+					local sz = amin (p.chipSize * (0.5 + r4.z)) (0.3 * (amin (x1 - x0) (z1 - z0)))
+					local sx = if onLeft then 1.0 else -1.0
+					local sy = if onTop then -1.0 else 1.0
+					pts[k] = pts[k] + [sx * sz, 0.6 * sz, sy * sz]
+					pts[k + 4] = pts[k + 4] + [sx * sz * 0.8, 0.3 * sz, sy * sz * 0.8]
+				)
+			)
+		)
 
 		-- channel 1 before depth/rotation, so the texture moves with the brick
 		local invL = 1.0 / nomL

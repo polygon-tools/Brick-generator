@@ -51,6 +51,10 @@ struct BrickGenAtlasLibStruct
 			local cw = (BrickGenJson_get c "w" 1) as float
 			local ch = (BrickGenJson_get c "h" 1) as float
 			-- pixel origin top-left -> UV origin bottom-left
+			-- trim a margin (8% of the brick height) on every side: detected
+			-- cells may include a sliver of joint or its shadow
+			local trim = 0.08 * ch
+			if cw > 4.0 * trim and ch > 4.0 * trim do ( cx += trim; cy += trim; cw -= 2.0 * trim; ch -= 2.0 * trim )
 			local cell = #(cx / imgW, 1.0 - (cy + ch) / imgH, (cx + cw) / imgW, 1.0 - cy / imgH, cw / ch)
 			if (BrickGenJson_get c "kind" "stretcher") == "header" then append a.headers cell
 			else append a.stretchers cell

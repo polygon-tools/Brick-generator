@@ -67,6 +67,8 @@ plugin simpleMeshMod BrickGenMod
 		depthJitter type:#float ui:spnDepthJitter default:1.5
 		rotJitter type:#float ui:spnRotJitter default:0.3
 		sizeJitter type:#float ui:spnSizeJitter default:1.0
+		chipPercent type:#float ui:spnChipPercent default:15.0
+		chipSize type:#float ui:spnChipSize default:6.0
 	)
 	parameters pMat rollout:rMat
 	(
@@ -259,6 +261,11 @@ plugin simpleMeshMod BrickGenMod
 		spinner spnDepthJitter "Diepte (mm):" type:#float range:[0, 20, 1.5]
 		spinner spnRotJitter "Rotatie (graden):" type:#float range:[0, 10, 0.3] scale:0.05
 		spinner spnSizeJitter "Maat (mm):" type:#float range:[0, 20, 1]
+		group "Afgebroken hoekjes"
+		(
+			spinner spnChipPercent "Stenen (%):" type:#float range:[0, 100, 15]
+			spinner spnChipSize "Grootte (mm):" type:#float range:[0, 50, 6]
+		)
 	)
 
 	rollout rJoint "Voeg"
@@ -362,6 +369,8 @@ plugin simpleMeshMod BrickGenMod
 				p.depthJitter = depthJitter
 				p.rotJitter = rotJitter
 				p.sizeJitter = sizeJitter
+				p.chipChance = chipPercent / 100.0
+				p.chipSize = chipSize
 				p.matIdCount = matIdCount
 				p.mortarMatId = mortarMatId
 				p.previewMode = previewMode
