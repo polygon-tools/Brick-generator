@@ -22,7 +22,6 @@ fn BrickGen_splinePolygons node =
 )
 
 global BrickGenModWarned = false
-global BrickGenCacheWarned = false
 
 plugin simpleMeshMod BrickGenMod
 	name:"BrickGen"
@@ -259,16 +258,15 @@ plugin simpleMeshMod BrickGenMod
 	-- Cache: the geometry is only rebuilt when a parameter or the spline changes.
 	local cacheSig = ""
 	local cacheBuf = undefined
-	local cacheMesh = undefined -- finished TriMesh of cacheBuf (with UVs)
 	local lastAtlasInfo = "geen atlas"
 
 
 	-- ----------------------------------------------------------------- Build
-	on modifyMesh do
+	on modifyMesh do if mesh != undefined do
 	(
+		-- (mesh is undefined when 3ds Max evaluates during a rollout open)
 		local t0 = timeStamp()
 		local buf = BrickGenMeshBuffer()
-		local fromCache = false
 		local node = refs.dependentNodes this firstOnly:true
 		local base = if node != undefined then node.baseObject else undefined
 		if base != undefined and (isKindOf base SplineShape or isKindOf base line) then
@@ -284,7 +282,7 @@ plugin simpleMeshMod BrickGenMod
 			for poly in raw do (for pt in poly do format "%," pt to:ss; format ";" to:ss)
 			if atlasFile != "" and doesFileExist atlasFile do format "%" (getFileModDate atlasFile) to:ss
 			local sig = ss as string
-			if sig == cacheSig and cacheBuf != undefined then ( buf = cacheBuf; fromCache = true )
+			if sig == cacheSig and cacheBuf != undefined then buf = cacheBuf
 			else
 			(
 				-- bounding box in mm
@@ -352,46 +350,9 @@ plugin simpleMeshMod BrickGenMod
 		)
 
 		local tGeo = timeStamp() - t0
-		-- unchanged: copy the finished mesh (one native call) instead of
-		-- writing all vertices and UVs again; verified, else rebuilt
-		local tApply = undefined
-		if fromCache and cacheMesh != undefined do
-		(
-			local ta = timeStamp()
-			local ok = false
-			try
-			(
-				BrickGenMesh.copyMeshInto mesh cacheMesh
-				ok = mesh.numverts == cacheMesh.numverts and mesh.numfaces == cacheMesh.numfaces and \
-					(meshop.getNumMaps mesh) >= 3 and \
-					(meshop.getNumMapVerts mesh 1) == mesh.numverts and (meshop.getNumMapVerts mesh 2) == mesh.numverts and \
-					(distance (meshop.getMapVert mesh 1 1) (meshop.getMapVert cacheMesh 1 1)) < 0.0001 and \
-					(distance (meshop.getMapVert mesh 1 mesh.numverts) (meshop.getMapVert cacheMesh 1 mesh.numverts)) < 0.0001 and \
-					(getFaceMatID mesh 1) == (getFaceMatID cacheMesh 1)
-			)
-			catch ( format "BrickGen: cache: %\n" (getCurrentException()) )
-			if ok then tApply = #(timeStamp() - ta, 0, 0)
-			else if not BrickGenCacheWarned do
-			(
-				BrickGenCacheWarned = true
-				try ( format "BrickGen: snelle cache werkt niet, volledige opbouw (verts % / %, maps % / %, uv-verts % / %, uv1 % / %, ID % / %)\n" \
-					mesh.numverts cacheMesh.numverts (meshop.getNumMaps mesh) (meshop.getNumMaps cacheMesh) \
-					(try (meshop.getNumMapVerts mesh 1) catch "?") (try (meshop.getNumMapVerts cacheMesh 1) catch "?") \
-					(try (meshop.getMapVert mesh 1 1) catch "?") (try (meshop.getMapVert cacheMesh 1 1) catch "?") \
-					(try (getFaceMatID mesh 1) catch "?") (try (getFaceMatID cacheMesh 1) catch "?") )
-				catch ( format "BrickGen: snelle cache werkt niet, volledige opbouw\n" )
-			)
-		)
-		if tApply == undefined do
-		(
-			tApply = BrickGenMesh.applyToMesh mesh buf
-			cacheMesh = undefined
-			if buf.faces.count > 0 do
-			(
-				-- a TriMesh copy via attach ("copy" did not give a mesh in 3ds Max 2026)
-				try ( cacheMesh = BrickGenMesh.copyMeshInto (TriMesh()) mesh ) catch ( cacheMesh = undefined )
-			)
-		)
+		-- (A cached TriMesh copied with meshop.attach lost its UV channels in
+		-- 3ds Max 2026, so the buffer is always written; ~1 s per 15k bricks.)
+		local tApply = BrickGenMesh.applyToMesh mesh buf
 		local ms = timeStamp() - t0
 		BrickGenSettings.lastBuildMs = ms
 		BrickGenSettings.lastTris = buf.faces.count
