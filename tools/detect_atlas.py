@@ -52,8 +52,23 @@ def best_chain(cands, pitches, tol):
 
 
 def detect(path, L, H, B=100.0, joint=12.0):
+    """Joints may be darker or lighter than the bricks: both are tried and the
+    result covering the largest area wins."""
     img = Image.open(path).convert("RGB")
     g = np.asarray(img.convert("L"), float)
+    best = []
+    for gp in (g, 255.0 - g):
+        try:
+            cells = detect_gray(gp, L, H, B, joint)
+        except ValueError:
+            cells = []
+        if sum(c["w"] * c["h"] for c in cells) > sum(c["w"] * c["h"] for c in best):
+            best = cells
+    h, w = g.shape
+    return img, w, h, best
+
+
+def detect_gray(g, L, H, B=100.0, joint=12.0):
     h, w = g.shape
     # bed joints
     row = np.percentile(g, 80, axis=1)
@@ -107,7 +122,7 @@ def detect(path, L, H, B=100.0, joint=12.0):
     for i, (x, y, cw, ch) in enumerate(cells):
         out.append({"id": i, "x": int(x), "y": int(y), "w": int(cw), "h": int(ch),
                     "kind": "stretcher" if cw > split else "header", "disabled": False})
-    return img, w, h, out
+    return out
 
 
 def main():
