@@ -151,6 +151,16 @@ struct BrickGenMeshStruct
 		local invL = 1.0 / nomL
 		local invH = 1.0 / p.brickH
 		local uv1 = for pt in pts collect [(pt.x - nomX0) * invL, (pt.z - nomZ0) * invH, 0.0]
+		-- side faces (rim 5-8 -> back 9-12): the back vertices get the UV moved
+		-- inwards by the brick depth, so a visible side shows a strip of the same
+		-- brick (box unfold) instead of one stretched row of pixels
+		for v = 9 to 12 do
+		(
+			local k = v - 8
+			local sx = if (k == 1 or k == 4) then 1.0 else -1.0
+			local sz = if (k == 1 or k == 2) then 1.0 else -1.0
+			uv1[v] = uv1[v] + [sx * depth * invL, sz * depth * invH, 0.0]
+		)
 		if p.atlas != undefined do
 			BrickGenAtlasLib.mapBrick p.atlas uv1 (R.u01x3 key 3) unit (nomL / p.brickH) p.atlasFlip p.atlasRotate
 
