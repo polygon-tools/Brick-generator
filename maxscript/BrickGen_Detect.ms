@@ -309,10 +309,69 @@ struct BrickGenDetectStruct
 	-- darker (usual) or lighter (light mortar) than the bricks: both are tried
 	-- and the result covering the largest area wins.
 	-- Returns #(imageWidth, imageHeight, cells) or undefined.
+	-- Same as detectAt, with the C# detector (BrickGen.Detector, a port of
+	-- detectGray): only the pixels are read in MAXScript. undefined on error.
+	fn detectAtNative imgPath L H dim =
+	(
+		local res = undefined
+		try
+		(
+			local src = openBitMap imgPath
+			if src == undefined do return undefined
+			local W = src.width
+			local Hh = src.height
+			local fs = amin 1.0 (dim / ((amax W Hh) as float))
+			local sw = amax 1 ((W * fs) as integer)
+			local sh = amax 1 ((Hh * fs) as integer)
+			local sm = src
+			if fs < 1.0 do
+			(
+				sm = bitmap sw sh
+				copy src sm
+			)
+			local flat = #()
+			flat.count = sw * sh
+			local k = 0
+			for y = 0 to sh - 1 do
+				for c in (getPixels sm [0, y] sw) do
+				(
+					k += 1
+					flat[k] = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
+				)
+			if sm != src do free sm
+			free src
+			local g = dotNet.ValueToDotNetObject flat (dotNetClass "System.Single[]")
+			local r = (dotNetClass "BrickGen.Detector").Detect g sw sh fs L H
+			if classOf r != Array do throw "result not converted"
+			local fx = sw as float / W
+			local fy = sh as float / Hh
+			local cells = #()
+			for i = 0 to (r[2] as integer) - 1 do
+			(
+				local j = 2 + 5 * i
+				append cells #((r[j + 1] / fx + 0.5) as integer, (r[j + 2] / fy + 0.5) as integer, \
+					(r[j + 3] / fx + 0.5) as integer, (r[j + 4] / fy + 0.5) as integer, \
+					(if r[j + 5] > 0.5 then "stretcher" else "header"))
+			)
+			res = #(W, Hh, cells, r[1] / fs)
+		)
+		catch
+		(
+			format "BrickGen: C#-herkenning gaf een fout, verder in MAXScript: %\n" (getCurrentException())
+			res = undefined
+		)
+		res
+	),
+
 	-- One detection on a photo read at most dim px: #(W, H, cells, coursePx)
 	-- with the better joint colour (largest area x regular bed joints).
 	fn detectAt imgPath L B H dim =
 	(
+		if ::BrickGenNative != undefined and ::BrickGenNative.available() do
+		(
+			local nres = detectAtNative imgPath L H dim
+			if nres != undefined do return nres
+		)
 		local info = readGray imgPath dim
 		if info == undefined do return undefined
 		local g = info[1]

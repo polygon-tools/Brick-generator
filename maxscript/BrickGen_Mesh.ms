@@ -37,7 +37,9 @@ struct BrickGenWallParams
 struct BrickGenMeshBuffer
 (
 	verts = #(), faces = #(), matIDs = #(), smooth = #(), uv1 = #(), uv2 = #(),
-	brickCount = 0
+	brickCount = 0,
+	uvFlat = false, -- uv1/uv2 as flat u, v, u, v ... (C# builder) instead of point3
+	nativeMs = 0.0  -- time spent in the C# builder
 )
 
 struct BrickGenMeshStruct
@@ -550,14 +552,10 @@ struct BrickGenMeshStruct
 			local uv = if ch == 1 then buf.uv1 else buf.uv2
 			meshop.setMapSupport m ch true
 			meshop.defaultMapFaces m ch
-			for i = 1 to uv.count do meshop.setMapVert m ch i uv[i]
-		)
-		-- self-check: the first UV must be ours
-		if buf.uv1.count > 0 do
-		(
-			local chk = meshop.getMapVert m 1 1
-			if (distance chk buf.uv1[1]) > 0.0001 do
-				format "BrickGen: UV-kanaal 1 klopt niet (mesh % / verwacht %)\n" chk buf.uv1[1]
+			if buf.uvFlat then
+				for i = 1 to uv.count / 2 do meshop.setMapVert m ch i [uv[2 * i - 1], uv[2 * i], 0.0]
+			else
+				for i = 1 to uv.count do meshop.setMapVert m ch i uv[i]
 		)
 		local t3 = timeStamp()
 		#(t1 - t0, t2 - t1, t3 - t2)

@@ -8,6 +8,7 @@ Kort:
 - Intern rekenen in mm; omzetten naar systeemeenheden met `units.decodeValue "1mm"`.
 - Randomness enkel via `BrickGenRNG` (seed, steenindex, kanaal). Nooit de globale `random` voor geometrie. Een nieuwe random-parameter = een nieuw kanaalnummer; bestaande kanalen nooit hergebruiken.
 - `BrickWall`: `classID` nooit wijzigen. Parameters nooit verwijderen of herschikken, enkel achteraan toevoegen (scènes slaan ze op). Zo ook voor de volgorde van de verbanden in `BrickGen_Bonds.ms` (de index wordt opgeslagen).
+- De modifier bouwt de geometrie met `bin/BrickGen.Core.dll` (C#, bron `csharp/BrickGen.Core/Builder.cs`, een port van `BrickGen_Mesh.ms` e.a.). **Wijzig je het algoritme, wijzig dan beide** en bouw de DLL opnieuw met `tools/build_native.sh`. Zonder DLL valt BrickGen terug op MAXScript.
 - Laadvolgorde staat in `maxscript/BrickGen_Startup.ms`. Een nieuw bestand moet daar ook bij.
 - Kleine commits per afgewerkt onderdeel. Werk PLAN.md bij als een beslissing verandert.
 - MAXScript-valkuilen (getest in 3ds Max 2026):

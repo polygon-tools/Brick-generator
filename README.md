@@ -14,14 +14,15 @@ Volledige specificatie en planning: [PLAN.md](PLAN.md).
 
 ## Installatie
 
-1. Clone of kopieer deze repo naar een vaste plaats (lokaal of op de gedeelde schijf), bv. `P:\Tools\BrickGen`.
+1. Clone of kopieer deze repo naar een vaste plaats (lokaal of op de gedeelde schijf), bv. `D:\Tools\Brick-generator`.
 2. Maak in je startup-map van 3ds Max een bestand `BrickGen_Loader.ms`.
    Pad: `%LOCALAPPDATA%\Autodesk\3dsMax\<versie> - 64bit\ENU\scripts\startup\`.
    Zet er deze regel in:
    ```maxscript
-   fileIn @"P:\Tools\BrickGen\maxscript\BrickGen_Startup.ms"
+   fileIn @"D:\Tools\Brick-generator\maxscript\BrickGen_Startup.ms"
    ```
-3. Herstart 3ds Max. In de MAXScript Listener verschijnt `BrickGen geladen uit ...`.
+3. Herstart 3ds Max. In de MAXScript Listener verschijnt `BrickGen geladen uit ... (snelle C#-module actief)`.
+   Staat er *zonder C#-module*: rechtsklik op `bin\BrickGen.Core.dll` → *Eigenschappen* → vink *Blokkering opheffen* aan (Windows blokkeert soms gedownloade DLL's) en herstart Max. BrickGen werkt ook zonder, maar veel trager.
 
 Het laden moet via de startup-map gebeuren: een scène met BrickWall-objecten kan pas geopend worden als de plugin al gedefinieerd is.
 

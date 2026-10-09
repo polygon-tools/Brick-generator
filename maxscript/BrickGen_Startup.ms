@@ -23,12 +23,14 @@
 		"BrickGen_AtlasEditor.ms",
 		"BrickGen_Material.ms",
 		"BrickGen_Mesh.ms",
+		"BrickGen_Native.ms",
 		"BrickGen_Object.ms",
 		"BrickGen_Modifier.ms"
 	) do fileIn (dir + f)
 
 	::BrickGenFormats.load (pathConfig.appendPath BrickGenRoot "presets\\formats.json")
-	format "BrickGen geladen uit %\n" ::BrickGenRoot
+	local native = ::BrickGenNative.load ::BrickGenRoot
+	format "BrickGen geladen uit % (%)\n" ::BrickGenRoot (if native then "snelle C#-module actief" else "zonder C#-module")
 )
 
 macroScript BrickGen_CreateWall

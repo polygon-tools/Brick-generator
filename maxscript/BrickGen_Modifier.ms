@@ -381,9 +381,20 @@ plugin simpleMeshMod BrickGenMod
 			p.atlasRotate = atlasRotate
 				if polys.count > 0 do
 				(
-					BrickGenMesh.buildRegionInto buf p polys
-					BrickGenMesh.buildRevealsInto buf (copy p) polys (revealDepth / s) revealOuter \
-						jambOffsetMm:(revealOffset / s)
+					-- C# builder when available (bin\BrickGen.Core.dll), else MAXScript
+					local nb = undefined
+					if BrickGenNative.available() do
+					(
+						BrickGenMesh.sanitize p
+						nb = BrickGenNative.build p polys (revealDepth / s) revealOuter (revealOffset / s)
+					)
+					if nb != undefined then buf = nb
+					else
+					(
+						BrickGenMesh.buildRegionInto buf p polys
+						BrickGenMesh.buildRevealsInto buf (copy p) polys (revealDepth / s) revealOuter \
+							jambOffsetMm:(revealOffset / s)
+					)
 				)
 				cacheSig = sig
 				cacheBuf = buf
@@ -405,7 +416,9 @@ plugin simpleMeshMod BrickGenMod
 		BrickGenSettings.lastTris = buf.faces.count
 		BrickGenSettings.lastPhases = #(tGeo) + tApply
 		if BrickGenSettings.logTiming or ms > BrickGenSettings.slowBuildMs do
-			format "BrickGen modifier: % stenen, % tris, % ms (geometrie %, setMesh %, smoothing %, uv %), %\n" \
-				buf.brickCount buf.faces.count ms tGeo tApply[1] tApply[2] tApply[3] lastAtlasInfo
+			format "BrickGen modifier: % stenen, % tris, % ms (geometrie % [%], setMesh %, smoothing %, uv %), %\n" \
+				buf.brickCount buf.faces.count ms tGeo \
+				(if buf.uvFlat then ("C# " + ((buf.nativeMs as integer) as string) + " ms") else "MAXScript") \
+				tApply[1] tApply[2] tApply[3] lastAtlasInfo
 	)
 )
