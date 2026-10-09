@@ -69,6 +69,13 @@ struct BrickGenDetectStruct
 		chain
 	),
 
+	-- Note: never pass a "for ... collect" that uses outer locals directly as a
+	-- function argument in this file; 3ds Max 2026 then fails with "Bad free
+	-- thunk local member index". Build the array in a local first.
+	fn maskBelow arr t = ( local m = #(); for v in arr do append m (v < t); m ),
+
+	fn columnValues g r0 r1 x = ( local vals = #(); for r = r0 to r1 do append vals g[r + 1][x]; vals ),
+
 	fn runMin vals a b = ( local m = 1e9; for i = a to b do m = amin m vals[i + 1]; m ),
 
 	-- Detect the brick cells. Sizes in mm (the real brick and joints).
@@ -103,7 +110,8 @@ struct BrickGenDetectStruct
 		-- bed joints: dark rows
 		local rowp = for r in g collect pct r 80
 		local thr = pct rowp 18
-		local beds = runs (for v in rowp collect v < thr) mn
+		local rowMask = maskBelow rowp thr
+		local beds = runs rowMask mn
 		if beds.count < 3 do return undefined
 		local d = for i = 1 to beds.count - 1 collect 0.5 * (beds[i + 1][1] + beds[i + 1][2] - beds[i][1] - beds[i][2])
 		local m0 = pct d 50
@@ -126,7 +134,8 @@ struct BrickGenDetectStruct
 		local coursePx = pct d 50
 		-- brick height and joint measured in the photo itself (the joints of
 		-- the photo need not match the joints set in BrickGen)
-		local brickPx = pct (for i = 1 to beds.count - 1 collect beds[i + 1][1] - beds[i][2] - 1) 50
+		local gaps = for i = 1 to beds.count - 1 collect beds[i + 1][1] - beds[i][2] - 1
+		local brickPx = pct gaps 50
 		local jointPx = amax 1.0 (coursePx - brickPx)
 		local s = brickPx / H -- px per mm
 		local pitches = #(L * s + jointPx, B * s + jointPx)
@@ -143,17 +152,25 @@ struct BrickGenDetectStruct
 				local r0 = y0 + mn
 				local r1 = y1 - mn
 				if r1 < r0 do ( r0 = y0; r1 = y1 )
-				local col = for x = 1 to sw collect pct (for r = r0 to r1 collect g[r + 1][x]) 85
+				local col = #()
+				for x = 1 to sw do
+				(
+					local vals = columnValues g r0 r1 x
+					append col (pct vals 85)
+				)
 				local med = pct col 50
 				local t = pct col 15
 				local cands = #()
-				for q in (runs (for v in col collect v < t) mn) where (q[2] - q[1]) <= 2.5 * jw do
+				local colMask = maskBelow col t
+				local colRuns = runs colMask mn
+				for q in colRuns where (q[2] - q[1]) <= 2.5 * jw do
 					append cands #(0.5 * (q[1] + q[2]), med - (runMin col q[1] q[2]))
 				-- every joint costs a penalty, so a weak dark spot inside a
 				-- stretcher does not split it into two headers
 				if cands.count > 0 do
 				(
-					local st = sort (for c in cands collect c[2])
+					local st = for c in cands collect c[2]
+					sort st
 					local strong = for i = (st.count / 2) + 1 to st.count collect st[i]
 					local pen = 0.6 * (pct strong 50)
 					for c in cands do c[2] -= pen
