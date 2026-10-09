@@ -342,6 +342,9 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 - [ ] Knop "Maak materiaal" volgens §10.
 - [ ] Test: render van de testgevel toont geen zichtbare herhaling.
 
+> UI-indeling modifier (na test fase 3): Gevel (+ dagkanten) · Verband · Steen · Steen: textuur en materiaal · Steen: vorm en imperfectie · Voeg (+ kleur/relief) · Weergave. Parameterblokken behouden hun volgorde; enkel de rollouts zijn herschikt.
+> Horizontale dagkanten (dorpel/latei): tonen het legvlak (rijen B diep); de eerste rij zet exact de gevellaag eronder/erboven voort, volgende rijen verspringen een halve strek.
+
 ### Fase 3 — Textuur kiezen zonder JSON (vervangt de webtool als eerste stap)
 > Beslissing (na fase 2-test): gebruikers kiezen gewoon een **jpg/png**; geen JSON, geen aparte webtool nodig voor het gewone geval.
 > - **Kies textuur...** in de modifier aanvaardt jpg/png/tif. BrickGen detecteert de stenen automatisch in 3ds Max (algoritme van `tools/detect_atlas.py`, in C# dat 3ds Max zelf compileert via `dotNet`, dus geen Python nodig; doel < 2 s voor een foto van 2000 px).
@@ -354,7 +357,7 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 
 - [x] Detectie in 3ds Max (`BrickGen_Detect.ms`), getest op de bestaande foto: 360 cellen in 3,2 s, werkt met Vlaams en halfsteens.
 - [x] "Kies textuur..." voor jpg/png + cache naast de foto (of in %TEMP%\BrickGen als die map niet schrijfbaar is).
-- [ ] Controlevenster met overlay en cellen aan/uit (`BrickGen_AtlasEditor.ms`, gecodeerd, te testen).
+- [x] Controlevenster met overlay en cellen aan/uit (`BrickGen_AtlasEditor.ms`), getest.
 - [ ] Herkennen van normal/roughness-maps op naam.
 
 ### Fase 3b — Webtool (optioneel, later)

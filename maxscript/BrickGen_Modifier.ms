@@ -29,7 +29,9 @@ plugin simpleMeshMod BrickGenMod
 	category:"BrickGen"
 	version:1
 (
-	-- ------------------------------------------------------------------ Gevel
+	-- ============================================================ parameters
+	-- Never reorder these blocks or their parameters (scenes store them);
+	-- only append. The rollouts below may be laid out freely.
 	parameters pWall rollout:rWall
 	(
 		flipSide type:#boolean ui:chkFlip default:false
@@ -38,18 +40,6 @@ plugin simpleMeshMod BrickGenMod
 		revealOuter type:#boolean ui:chkRevealOuter default:false
 		revealOffset type:#worldUnits ui:spnRevealOffset default:0.0
 	)
-	rollout rWall "Gevel"
-	(
-		checkbox chkFlip "Andere kant (gevel omdraaien)"
-		spinner spnSeed "Seed:" type:#integer range:[0, 999999999, 12345]
-		button btnNewSeed "Nieuwe seed" width:140
-		on btnNewSeed pressed do seed = random 1 999999
-		spinner spnReveal "Dagkantdiepte:" type:#worldUnits range:[0, 1e6, 30]
-		checkbox chkRevealOuter "Ook langs de buitenrand"
-		spinner spnRevealOffset "Dagkant offset:" type:#worldUnits range:[-1e6, 1e6, 0]
-	)
-
-	-- ----------------------------------------------------------------- Steen
 	parameters pBrick rollout:rBrick
 	(
 		formatPreset type:#integer ui:ddlFormat default:1
@@ -57,12 +47,106 @@ plugin simpleMeshMod BrickGenMod
 		brickB type:#float ui:spnBrickB default:100.0
 		brickH type:#float ui:spnBrickH default:50.0
 	)
-	rollout rBrick "Steen (mm)"
+	parameters pJoint rollout:rJoint
+	(
+		bedJoint type:#float ui:spnBedJoint default:12.0
+		headJoint type:#float ui:spnHeadJoint default:12.0
+		jointRecess type:#float ui:spnRecess default:5.0
+		mortarEnabled type:#boolean ui:chkMortar default:true
+	)
+	parameters pBond rollout:rBond
+	(
+		bondType type:#integer ui:ddlBond default:1
+		startOffset type:#float ui:spnStartOffset default:0.0
+	)
+	parameters pShape rollout:rShape
+	(
+		chamfer type:#float ui:spnChamfer default:2.0
+		chamferJitter type:#float ui:spnChamferJitter default:0.3
+		cornerJitter type:#float ui:spnCornerJitter default:1.0
+		depthJitter type:#float ui:spnDepthJitter default:1.5
+		rotJitter type:#float ui:spnRotJitter default:0.3
+		sizeJitter type:#float ui:spnSizeJitter default:1.0
+	)
+	parameters pMat rollout:rMat
+	(
+		matIdCount type:#integer ui:spnMatIdCount default:5
+		mortarMatId type:#integer ui:spnMortarMatId default:100
+		atlasFile type:#string ui:edtAtlasPath default:""
+		atlasFlip type:#boolean ui:chkAtlasFlip default:true
+		atlasRotate type:#boolean ui:chkAtlasRotate default:true
+		-- not bound to the UI: the material holds the live values (changing a
+		-- parameter would re-evaluate the modifier). Kept for older scenes.
+		mortarColor type:#color default:(color 120 115 108)
+		brickGloss type:#float default:30.0
+	)
+	parameters pView rollout:rView
+	(
+		previewMode type:#boolean ui:chkPreview default:false
+	)
+
+	-- ===================================================== material settings
+	-- Mortar colour, gloss and relief live in the material (made by "Maak
+	-- materiaal"); the controls in "Steen: textuur" and "Voeg" change it
+	-- directly, without rebuilding the geometry.
+	local uiMortarCol = color 120 115 108
+	local uiGloss = 30.0
+	local uiReliefBrick = 30.0
+	local uiReliefMortar = 60.0
+
+	fn bgNode = ( refs.dependentNodes this firstOnly:true )
+	fn bgReadMaterial =
+	(
+		local node = bgNode()
+		local st = if node != undefined then BrickGenMaterial.readSettings node.material else undefined
+		if st != undefined do
+		(
+			uiMortarCol = st[1]
+			uiGloss = st[2]
+			uiReliefBrick = st[3]
+			uiReliefMortar = st[4]
+		)
+	)
+	fn bgUpdateMaterial =
+	(
+		local node = bgNode()
+		if node != undefined do BrickGenMaterial.update node.material uiMortarCol uiGloss \
+			uiReliefBrick uiReliefMortar false
+	)
+
+	-- ============================================================== rollouts
+	rollout rWall "Gevel"
+	(
+		checkbox chkFlip "Andere kant (gevel omdraaien)"
+		spinner spnSeed "Seed:" type:#integer range:[0, 999999999, 12345] across:2
+		button btnNewSeed "Nieuwe" width:60 align:#right
+		on btnNewSeed pressed do seed = random 1 999999
+		group "Dagkanten (openingen)"
+		(
+			spinner spnReveal "Diepte:" type:#worldUnits range:[0, 1e6, 30]
+			spinner spnRevealOffset "Offset zijkant:" type:#worldUnits range:[-1e6, 1e6, 0]
+			checkbox chkRevealOuter "Ook langs de buitenrand"
+		)
+	)
+
+	rollout rBond "Verband"
+	(
+		dropdownlist ddlBond ""
+		spinner spnStartOffset "Startoffset (mm):" type:#float range:[-10000, 10000, 0]
+
+		on rBond open do
+		(
+			ddlBond.items = BrickGenBonds.labels()
+			ddlBond.selection = bondType
+		)
+	)
+
+	rollout rBrick "Steen"
 	(
 		dropdownlist ddlFormat "Formaat:"
-		spinner spnBrickL "Lengte L:" type:#float range:[1, 1000, 210]
-		spinner spnBrickB "Breedte B:" type:#float range:[1, 1000, 100]
-		spinner spnBrickH "Hoogte H:" type:#float range:[1, 1000, 50]
+		spinner spnBrickL "Lengte L (mm):" type:#float range:[1, 1000, 210]
+		spinner spnBrickB "Breedte B (mm):" type:#float range:[1, 1000, 100]
+		spinner spnBrickH "Hoogte H (mm):" type:#float range:[1, 1000, 50]
 
 		on rBrick open do
 		(
@@ -82,78 +166,9 @@ plugin simpleMeshMod BrickGenMod
 		)
 	)
 
-	-- ------------------------------------------------------------------ Voeg
-	parameters pJoint rollout:rJoint
+	rollout rMat "Steen: textuur en materiaal"
 	(
-		bedJoint type:#float ui:spnBedJoint default:12.0
-		headJoint type:#float ui:spnHeadJoint default:12.0
-		jointRecess type:#float ui:spnRecess default:5.0
-		mortarEnabled type:#boolean ui:chkMortar default:true
-	)
-	rollout rJoint "Voeg (mm)"
-	(
-		spinner spnBedJoint "Lintvoeg:" type:#float range:[0, 100, 12]
-		spinner spnHeadJoint "Stootvoeg:" type:#float range:[0, 100, 12]
-		spinner spnRecess "Terugligging:" type:#float range:[0, 100, 5]
-		checkbox chkMortar "Voegvlak" checked:true
-	)
-
-	-- --------------------------------------------------------------- Verband
-	parameters pBond rollout:rBond
-	(
-		bondType type:#integer ui:ddlBond default:1
-		startOffset type:#float ui:spnStartOffset default:0.0
-	)
-	rollout rBond "Verband"
-	(
-		dropdownlist ddlBond "Verband:"
-		spinner spnStartOffset "Startoffset (mm):" type:#float range:[-10000, 10000, 0]
-
-		on rBond open do
-		(
-			ddlBond.items = BrickGenBonds.labels()
-			ddlBond.selection = bondType
-		)
-	)
-
-	-- ----------------------------------------------------- Vorm/imperfectie
-	parameters pShape rollout:rShape
-	(
-		chamfer type:#float ui:spnChamfer default:2.0
-		chamferJitter type:#float ui:spnChamferJitter default:0.3
-		cornerJitter type:#float ui:spnCornerJitter default:1.0
-		depthJitter type:#float ui:spnDepthJitter default:1.5
-		rotJitter type:#float ui:spnRotJitter default:0.3
-		sizeJitter type:#float ui:spnSizeJitter default:1.0
-	)
-	rollout rShape "Vorm en imperfectie"
-	(
-		spinner spnChamfer "Chamfer (mm):" type:#float range:[0, 50, 2]
-		spinner spnChamferJitter "Chamfer-variatie:" type:#float range:[0, 1, 0.3] scale:0.01
-		spinner spnCornerJitter "Hoeken (mm):" type:#float range:[0, 20, 1]
-		spinner spnDepthJitter "Diepte (mm):" type:#float range:[0, 20, 1.5]
-		spinner spnRotJitter "Rotatie (graden):" type:#float range:[0, 10, 0.3] scale:0.05
-		spinner spnSizeJitter "Maat (mm):" type:#float range:[0, 20, 1]
-	)
-
-	-- ------------------------------------------------------------- Materiaal
-	parameters pMat rollout:rMat
-	(
-		matIdCount type:#integer ui:spnMatIdCount default:5
-		mortarMatId type:#integer ui:spnMortarMatId default:100
-		atlasFile type:#string ui:edtAtlasPath default:""
-		atlasFlip type:#boolean ui:chkAtlasFlip default:true
-		atlasRotate type:#boolean ui:chkAtlasRotate default:true
-		-- not bound to the UI: the material holds the live values (changing a
-		-- parameter would re-evaluate the modifier). Kept for older scenes.
-		mortarColor type:#color default:(color 120 115 108)
-		brickGloss type:#float default:30.0
-	)
-	rollout rMat "Materiaal en textuur"
-	(
-		spinner spnMatIdCount "Steen-ID's (1..N):" type:#integer range:[1, 99, 5]
-		spinner spnMortarMatId "Voeg-ID:" type:#integer range:[1, 9999, 100]
-		group "Textuur (foto of atlas)"
+		group "Textuur (foto van een gevel)"
 		(
 			edittext edtAtlas "" readOnly:true width:140
 			edittext edtAtlasPath "" readOnly:true visible:false
@@ -163,43 +178,28 @@ plugin simpleMeshMod BrickGenMod
 			checkbox chkAtlasFlip "Random spiegelen"
 			checkbox chkAtlasRotate "Random 180 graden draaien"
 		)
-		group "Materiaal (past het materiaal meteen aan)"
+		group "Uitzicht steen"
 		(
-			colorpicker cpMortar "Voegkleur:" color:(color 120 115 108) modal:false
-			spinner spnGloss "Glans steen (%):" type:#float range:[0, 100, 30]
-			spinner spnReliefBrick "Relief steen (%):" type:#float range:[0, 200, 30]
-			spinner spnReliefMortar "Relief voeg (%):" type:#float range:[0, 200, 60]
+			spinner spnGloss "Glans (%):" type:#float range:[0, 100, 30]
+			spinner spnReliefBrick "Relief (%):" type:#float range:[0, 200, 30]
 		)
-		button btnMakeMat "Maak materiaal" width:140 height:26
-
-		-- These controls only change the material (never the geometry), so they
-		-- are not bound to parameters.
-		fn bgNode = ( refs.dependentNodes this firstOnly:true )
-		fn updateMaterial =
+		group "Materiaal"
 		(
-			local node = bgNode()
-			if node != undefined do BrickGenMaterial.update node.material cpMortar.color spnGloss.value \
-				spnReliefBrick.value spnReliefMortar.value false
+			button btnMakeMat "Maak materiaal" width:140 height:26
+			spinner spnMatIdCount "Steen-ID's (1..N):" type:#integer range:[1, 99, 5]
+			spinner spnMortarMatId "Voeg-ID:" type:#integer range:[1, 9999, 100]
 		)
-		fn readMaterial =
-		(
-			local node = bgNode()
-			local st = if node != undefined then BrickGenMaterial.readSettings node.material else undefined
-			if st != undefined do
-			(
-				cpMortar.color = st[1]
-				spnGloss.value = st[2]
-				spnReliefBrick.value = st[3]
-				spnReliefMortar.value = st[4]
-			)
-		)
-		on cpMortar changed c do updateMaterial()
-		on spnGloss changed v do updateMaterial()
-		on spnReliefBrick changed v do updateMaterial()
-		on spnReliefMortar changed v do updateMaterial()
 
 		fn refresh = ( edtAtlas.text = if atlasFile == "" then "(geen textuur)" else filenameFromPath atlasFile )
-		on rMat open do ( refresh(); readMaterial() )
+		on rMat open do
+		(
+			refresh()
+			bgReadMaterial()
+			spnGloss.value = uiGloss
+			spnReliefBrick.value = uiReliefBrick
+		)
+		on spnGloss changed v do ( uiGloss = v; bgUpdateMaterial() )
+		on spnReliefBrick changed v do ( uiReliefBrick = v; bgUpdateMaterial() )
 		on btnAtlas pressed do
 		(
 			local startDir = if atlasFile != "" then getFilenamePath atlasFile
@@ -234,7 +234,7 @@ plugin simpleMeshMod BrickGenMod
 		)
 		on btnMakeMat pressed do
 		(
-			local node = refs.dependentNodes this firstOnly:true
+			local node = bgNode()
 			local atlas = BrickGenAtlasLib.get (BrickGenDetect.atlasJsonFor atlasFile brickL brickB brickH bedJoint headJoint)
 			if atlas == undefined and atlasFile != "" do
 				messageBox "De atlas kon niet gelezen worden; het materiaal krijgt een effen kleur." title:"BrickGen"
@@ -242,19 +242,46 @@ plugin simpleMeshMod BrickGenMod
 				not (doesFileExist (BrickGenAtlasLib.mapPath atlas "diffuse")) do
 				messageBox ("Textuur niet gevonden:\n" + (BrickGenAtlasLib.mapPath atlas "diffuse") + \
 					"\n\nZet de afbeelding naast het atlas-bestand.") title:"BrickGen"
-			BrickGenMaterial.makeFor node atlas matIdCount mortarMatId mortarCol:cpMortar.color gloss:spnGloss.value \
-				reliefBrick:spnReliefBrick.value reliefMortar:spnReliefMortar.value disp:false
+			BrickGenMaterial.makeFor node atlas matIdCount mortarMatId mortarCol:uiMortarCol gloss:uiGloss \
+				reliefBrick:uiReliefBrick reliefMortar:uiReliefMortar disp:false
 		)
 	)
 
-	-- -------------------------------------------------------------- Weergave
-	parameters pView rollout:rView
+	rollout rShape "Steen: vorm en imperfectie"
 	(
-		previewMode type:#boolean ui:chkPreview default:false
+		spinner spnChamfer "Afronding (mm):" type:#float range:[0, 50, 2]
+		spinner spnChamferJitter "Afronding-variatie:" type:#float range:[0, 1, 0.3] scale:0.01
+		spinner spnCornerJitter "Hoeken (mm):" type:#float range:[0, 20, 1]
+		spinner spnDepthJitter "Diepte (mm):" type:#float range:[0, 20, 1.5]
+		spinner spnRotJitter "Rotatie (graden):" type:#float range:[0, 10, 0.3] scale:0.05
+		spinner spnSizeJitter "Maat (mm):" type:#float range:[0, 20, 1]
 	)
+
+	rollout rJoint "Voeg"
+	(
+		spinner spnBedJoint "Lintvoeg (mm):" type:#float range:[0, 100, 12]
+		spinner spnHeadJoint "Stootvoeg (mm):" type:#float range:[0, 100, 12]
+		spinner spnRecess "Terugligging (mm):" type:#float range:[0, 100, 5]
+		checkbox chkMortar "Voegvlak" checked:true
+		group "Uitzicht voeg"
+		(
+			colorpicker cpMortar "Kleur:" color:(color 120 115 108) modal:false
+			spinner spnReliefMortar "Relief (%):" type:#float range:[0, 200, 60]
+		)
+
+		on rJoint open do
+		(
+			bgReadMaterial()
+			cpMortar.color = uiMortarCol
+			spnReliefMortar.value = uiReliefMortar
+		)
+		on cpMortar changed c do ( uiMortarCol = c; bgUpdateMaterial() )
+		on spnReliefMortar changed v do ( uiReliefMortar = v; bgUpdateMaterial() )
+	)
+
 	rollout rView "Weergave"
 	(
-		checkbox chkPreview "Snelle preview (geen chamfer/jitter)"
+		checkbox chkPreview "Snelle preview (geen afronding/variatie)"
 	)
 
 	on create do
