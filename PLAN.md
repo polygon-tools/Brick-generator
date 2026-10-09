@@ -311,6 +311,21 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 
 ---
 
+## Stand van zaken (voor de volgende sessie)
+
+> Laatst bijgewerkt: 9 oktober 2026. Alles staat op branch `claude/blissful-johnson-cohvjs`; de gebruiker merget in één keer.
+>
+> **Waar we stonden:** de gebruiker verhuist BrickGen van `C:\Tools\Brick-generator` naar `D:\Tools\Brick-generator`. Bij het opstarten gaf de loader de fout "fileIn: can't open file - D:\Tools\Brick-generator\maxscript\BrickGen_Startup.ms". Waarschijnlijke oorzaak: de ZIP staat in een extra submap (bv. `D:\Tools\Brick-generator\Brick-generator-main\...`).
+>
+> **Volgende stappen voor de gebruiker:**
+> 1. Max sluiten. In Verkenner `D:\Tools\Brick-generator` openen. Staat daar een submap (bv. `Brick-generator-main`)? Alles daarin knippen en één map hoger plakken, zodat `D:\Tools\Brick-generator\maxscript`, `\bin`, `\presets` bestaan. Controleren dat de pull request gemerged was vóór het downloaden van de ZIP (anders bestaat `bin\BrickGen.Core.dll` niet).
+> 2. Loader `%LOCALAPPDATA%\Autodesk\3dsMax\2026 - 64bit\ENU\scripts\startup\BrickGen_Loader.ms` bevat: `fileIn @"D:\Tools\Brick-generator\maxscript\BrickGen_Startup.ms"`.
+> 3. Max starten; Listener moet tonen: `BrickGen geladen uit D:\Tools\Brick-generator (snelle C#-module actief)`. Bij "zonder C#-module": rechtsklik `bin\BrickGen.Core.dll` → Eigenschappen → Blokkering opheffen, Max herstarten.
+> 4. Testronde (alles samen, nog niet getest in Max): C#-geometrie (log toont "[C# … ms]"), C#-steenherkenning, nieuwe foto ook in materiaal, 8%-bijsnijding (geen voeg in steen), afgebroken hoekjes, relief zonder JPEG-blokjes, cel met passende verhouding (lange stenen), nieuwe paneelindeling, horizontale dagkanten (legvlak). Daarna Listener-regels "BrickGen…", renders en screenshot van het paneel sturen.
+> 5. Werkt alles: `C:\Tools\Brick-generator` verwijderen; scènes met de oude rode foto opnieuw koppelen via "Kies textuur...".
+>
+> **Openstaand daarna:** kromme stenen (extra vertices, optioneel), betere herkenning voor lange stenen van wisselende lengte, schuine randen (puntgevels), rollagen.
+
 ## 12. Fasering met acceptatiecriteria
 
 ### Fase 0 — Opzet (½ dag)
