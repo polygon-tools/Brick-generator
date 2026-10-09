@@ -15,3 +15,4 @@ Kort:
   - In een top-level blok `( ... )` worden globals die pas tijdens dat blok via `fileIn` ontstaan als lokaal gezien: gebruik `::Naam`.
   - Een nieuwe TriMesh heeft enkel map channel 0 en 1: `meshop.setNumMaps` vóór kanaal 2+.
   - `pi` is een constante: niet als variabelenaam gebruiken.
+  - MAXScript is niet hoofdlettergevoelig: `W` en `w` zijn dezelfde variabele.
