@@ -363,8 +363,10 @@ plugin simpleMeshMod BrickGenMod
 			(
 				BrickGenMesh.copyMeshInto mesh cacheMesh
 				ok = mesh.numverts == cacheMesh.numverts and mesh.numfaces == cacheMesh.numfaces and \
-					(meshop.getNumMaps mesh) >= 3 and (meshop.getMapSupport mesh 1) and \
+					(meshop.getNumMaps mesh) >= 3 and \
+					(meshop.getNumMapVerts mesh 1) == mesh.numverts and (meshop.getNumMapVerts mesh 2) == mesh.numverts and \
 					(distance (meshop.getMapVert mesh 1 1) (meshop.getMapVert cacheMesh 1 1)) < 0.0001 and \
+					(distance (meshop.getMapVert mesh 1 mesh.numverts) (meshop.getMapVert cacheMesh 1 mesh.numverts)) < 0.0001 and \
 					(getFaceMatID mesh 1) == (getFaceMatID cacheMesh 1)
 			)
 			catch ( format "BrickGen: cache: %\n" (getCurrentException()) )
@@ -372,9 +374,10 @@ plugin simpleMeshMod BrickGenMod
 			else if not BrickGenCacheWarned do
 			(
 				BrickGenCacheWarned = true
-				try ( format "BrickGen: snelle cache werkt niet, volledige opbouw (verts % / %, maps % / %, kanaal1 % / %, ID % / %)\n" \
+				try ( format "BrickGen: snelle cache werkt niet, volledige opbouw (verts % / %, maps % / %, uv-verts % / %, uv1 % / %, ID % / %)\n" \
 					mesh.numverts cacheMesh.numverts (meshop.getNumMaps mesh) (meshop.getNumMaps cacheMesh) \
-					(meshop.getMapSupport mesh 1) (meshop.getMapSupport cacheMesh 1) \
+					(try (meshop.getNumMapVerts mesh 1) catch "?") (try (meshop.getNumMapVerts cacheMesh 1) catch "?") \
+					(try (meshop.getMapVert mesh 1 1) catch "?") (try (meshop.getMapVert cacheMesh 1 1) catch "?") \
 					(try (getFaceMatID mesh 1) catch "?") (try (getFaceMatID cacheMesh 1) catch "?") )
 				catch ( format "BrickGen: snelle cache werkt niet, volledige opbouw\n" )
 			)

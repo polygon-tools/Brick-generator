@@ -473,8 +473,6 @@ struct BrickGenMeshStruct
 		meshop.setNumMaps dst 3 keep:false
 		meshop.setMapSupport dst 1 true
 		meshop.setMapSupport dst 2 true
-		meshop.setNumMapVerts dst 1 0
-		meshop.setNumMapVerts dst 2 0
 		meshop.attach dst src
 		dst
 	),
