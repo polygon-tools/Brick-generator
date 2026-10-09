@@ -476,15 +476,25 @@ struct BrickGenMeshStruct
 		-- hide the quad diagonals (coplanar edges) in one call
 		meshop.autoEdge m #all 5.0 type:#setClear
 		local t2 = timeStamp()
-		-- map verts = geometry verts, map faces = geometry faces.
+		-- one map vertex per geometry vertex, map faces = geometry faces, built
+		-- explicitly (meshop.defaultMapFaces did not keep our UVs in 3ds Max 2026).
 		-- A fresh mesh only has channels 0 and 1: allocate channel 2 first.
 		if (meshop.getNumMaps m) < 3 do meshop.setNumMaps m 3 keep:true
 		for ch = 1 to 2 do
 		(
 			local uv = if ch == 1 then buf.uv1 else buf.uv2
 			meshop.setMapSupport m ch true
-			meshop.defaultMapFaces m ch
+			meshop.setNumMapVerts m ch uv.count keep:false
+			meshop.setNumMapFaces m ch nf keep:false
 			for i = 1 to uv.count do meshop.setMapVert m ch i uv[i]
+			for f = 1 to nf do meshop.setMapFace m ch f buf.faces[f]
+		)
+		-- self-check: the first UV must be ours
+		if buf.uv1.count > 0 do
+		(
+			local chk = meshop.getMapVert m 1 1
+			if (distance chk buf.uv1[1]) > 0.0001 do
+				format "BrickGen: UV-kanaal 1 klopt niet (mesh % / verwacht %)\n" chk buf.uv1[1]
 		)
 		local t3 = timeStamp()
 		#(t1 - t0, t2 - t1, t3 - t2)
