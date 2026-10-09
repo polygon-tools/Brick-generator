@@ -16,3 +16,4 @@ Kort:
   - Een nieuwe TriMesh heeft enkel map channel 0 en 1: `meshop.setNumMaps` vóór kanaal 2+.
   - `pi` is een constante: niet als variabelenaam gebruiken.
   - MAXScript is niet hoofdlettergevoelig: `W` en `w` zijn dezelfde variabele.
+  - `copy` op een array gaf `OK` terug (bij de gebruiker, Max 2026): kopieer een array met `for v in arr collect v`.

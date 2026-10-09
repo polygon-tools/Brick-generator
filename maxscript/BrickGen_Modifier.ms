@@ -368,7 +368,7 @@ plugin simpleMeshMod BrickGenMod
 					(distance (meshop.getMapVert mesh 1 1) (meshop.getMapVert cacheMesh 1 1)) < 0.0001 and \
 					(getFaceMatID mesh 1) == (getFaceMatID cacheMesh 1)
 			)
-			catch ()
+			catch ( format "BrickGen: cache: %\n" (getCurrentException()) )
 			if ok then tApply = #(timeStamp() - ta, 0, 0)
 			else if not BrickGenCacheWarned do
 			(
@@ -379,7 +379,12 @@ plugin simpleMeshMod BrickGenMod
 		if tApply == undefined do
 		(
 			tApply = BrickGenMesh.applyToMesh mesh buf
-			cacheMesh = if buf.faces.count > 0 then copy mesh else undefined
+			cacheMesh = undefined
+			if buf.faces.count > 0 do
+			(
+				-- a TriMesh copy via attach ("copy" did not give a mesh in 3ds Max 2026)
+				try ( cacheMesh = TriMesh(); meshop.attach cacheMesh mesh ) catch ( cacheMesh = undefined )
+			)
 		)
 		local ms = timeStamp() - t0
 		BrickGenSettings.lastBuildMs = ms
