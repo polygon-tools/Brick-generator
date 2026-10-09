@@ -30,8 +30,10 @@ struct BrickGenAtlasLibStruct
 		local a = BrickGenAtlas path:path dir:(getFilenamePath path)
 		a.name = BrickGenJson_get data "name" (getFilenameFile path)
 		local img = BrickGenJson_get data "image" undefined
-		local W = (BrickGenJson_get img "width" 1) as float
-		local H = (BrickGenJson_get img "height" 1) as float
+		-- MAXScript is case-insensitive: imgW/imgH must not be called W/H, they
+		-- would be the same variables as the cell's w/h below.
+		local imgW = (BrickGenJson_get img "width" 1) as float
+		local imgH = (BrickGenJson_get img "height" 1) as float
 		local rb = BrickGenJson_get data "realBrick" undefined
 		a.realL = (BrickGenJson_get rb "L" 210) as float
 		a.realH = (BrickGenJson_get rb "H" 50) as float
@@ -44,12 +46,12 @@ struct BrickGenAtlasLibStruct
 		)
 		for c in (BrickGenJson_get data "cells" #()) where not (BrickGenJson_get c "disabled" false) do
 		(
-			local x = (BrickGenJson_get c "x" 0) as float
-			local y = (BrickGenJson_get c "y" 0) as float
-			local w = (BrickGenJson_get c "w" 1) as float
-			local h = (BrickGenJson_get c "h" 1) as float
+			local cx = (BrickGenJson_get c "x" 0) as float
+			local cy = (BrickGenJson_get c "y" 0) as float
+			local cw = (BrickGenJson_get c "w" 1) as float
+			local ch = (BrickGenJson_get c "h" 1) as float
 			-- pixel origin top-left -> UV origin bottom-left
-			local cell = #(x / W, 1.0 - (y + h) / H, (x + w) / W, 1.0 - y / H, w / h)
+			local cell = #(cx / imgW, 1.0 - (cy + ch) / imgH, (cx + cw) / imgW, 1.0 - cy / imgH, cw / ch)
 			if (BrickGenJson_get c "kind" "stretcher") == "header" then append a.headers cell
 			else append a.stretchers cell
 		)
