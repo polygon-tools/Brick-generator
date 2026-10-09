@@ -78,10 +78,9 @@ struct BrickGenDetectStruct
 
 	fn runMin vals a b = ( local m = 1e9; for i = a to b do m = amin m vals[i + 1]; m ),
 
-	-- Detect the brick cells. Sizes in mm (the real brick and joints).
-	-- Returns #(imageWidth, imageHeight, cells) with cells
-	-- #(x, y, w, h, kind) in full-size pixels, or undefined.
-	fn detect imgPath L B H bedJoint headJoint =
+	-- Grey values of the photo on a reduced copy: #(g, W, H, sw, fs, fx, fy)
+	-- with g[row][col], or undefined.
+	fn readGray imgPath =
 	(
 		local src = openBitMap imgPath
 		if src == undefined do return undefined
@@ -96,15 +95,17 @@ struct BrickGenDetectStruct
 			sm = bitmap sw sh
 			copy src sm
 		)
-		local fx = sw as float / W
-		local fy = sh as float / Hh
-
-		-- grey values, g[row][col]
 		local g = for y = 0 to sh - 1 collect
 			for c in (getPixels sm [0, y] sw) collect (0.299 * c.r + 0.587 * c.g + 0.114 * c.b)
 		if sm != src do free sm
 		free src
+		#(g, W, Hh, sw, fs, sw as float / W, sh as float / Hh)
+	),
 
+	-- Brick cells in grey image g, assuming joints darker than the bricks.
+	-- Returns #(x, y, w, h, kind) per cell in full-size pixels (maybe empty).
+	fn detectGray g sw fs fx fy L B H =
+	(
 		local mn = amax 1 ((2.0 * fs + 0.5) as integer)
 
 		-- bed joints: dark rows
@@ -112,7 +113,7 @@ struct BrickGenDetectStruct
 		local thr = pct rowp 18
 		local rowMask = maskBelow rowp thr
 		local beds = runs rowMask mn
-		if beds.count < 3 do return undefined
+		if beds.count < 3 do return #()
 		local d = for i = 1 to beds.count - 1 collect 0.5 * (beds[i + 1][1] + beds[i + 1][2] - beds[i][1] - beds[i][2])
 		local m0 = pct d 50
 		-- drop spurious beds (dark specks inside a course): keep the darker one
@@ -129,7 +130,7 @@ struct BrickGenDetectStruct
 			else append keep bed
 		)
 		beds = keep
-		if beds.count < 3 do return undefined
+		if beds.count < 3 do return #()
 		d = for i = 1 to beds.count - 1 collect 0.5 * (beds[i + 1][1] + beds[i + 1][2] - beds[i][1] - beds[i][2])
 		local coursePx = pct d 50
 		-- brick height and joint measured in the photo itself (the joints of
@@ -189,7 +190,30 @@ struct BrickGenDetectStruct
 				)
 			)
 		)
-		#(W, Hh, cells)
+		cells
+	),
+
+	-- Detect the brick cells. Sizes in mm (the real brick). Joints may be
+	-- darker (usual) or lighter (light mortar) than the bricks: both are tried
+	-- and the result covering the largest area wins.
+	-- Returns #(imageWidth, imageHeight, cells) or undefined.
+	fn detect imgPath L B H bedJoint headJoint =
+	(
+		local info = readGray imgPath
+		if info == undefined do return undefined
+		local g = info[1]
+		local best = #()
+		local bestArea = 0.0
+		for pass = 1 to 2 do
+		(
+			local gp = g
+			if pass == 2 do gp = for r in g collect (for v in r collect 255.0 - v)
+			local cells = detectGray gp info[4] info[5] info[6] info[7] L B H
+			local area = 0.0
+			for c in cells do area += c[3] * c[4]
+			if area > bestArea do ( best = cells; bestArea = area )
+		)
+		#(info[2], info[3], best)
 	),
 
 	fn jsonStr s = ( "\"" + (substituteString (substituteString s "\\" "\\\\") "\"" "\\\"") + "\"" ),
@@ -232,7 +256,8 @@ struct BrickGenDetectStruct
 	-- signature of the detection input: photo date + brick sizes
 	fn inputSig imgPath L B H bedJoint headJoint =
 	(
-		(getFileModDate imgPath) + "|" + (L as string) + "|" + (B as string) + "|" + \
+		-- "v2": light-mortar detection; older caches are detected again
+		"v2|" + (getFileModDate imgPath) + "|" + (L as string) + "|" + (B as string) + "|" + \
 			(H as string) -- joints are measured in the photo, not taken from BrickGen
 	),
 
