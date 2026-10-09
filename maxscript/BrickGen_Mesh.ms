@@ -29,7 +29,8 @@ struct BrickGenWallParams
 	uOffset = 0.0,    -- mm along the path before this piece (UV channel 2)
 	segIndex = 0,     -- piece number, varies the randomness per segment
 	-- texture atlas (BrickGen_Atlas.ms); undefined = plain 0..1 UV per brick
-	atlas = undefined, atlasFlip = true, atlasRotate = true
+	atlas = undefined, atlasFlip = true, atlasRotate = true,
+	bondOverride = undefined -- a BrickGenBond used instead of bondType (reveal strips)
 )
 
 struct BrickGenMeshBuffer
@@ -308,7 +309,7 @@ struct BrickGenMeshStruct
 		p.wallHeight = maxY
 
 		local ys = G.vertexHeights polys
-		local bond = BrickGenBonds.get p.bondType
+		local bond = if p.bondOverride != undefined then p.bondOverride else BrickGenBonds.get p.bondType
 		local pitchZ = p.brickH + p.bedJoint
 		local nCourses = (ceil (maxY / pitchZ)) as integer
 		local offsets = BrickGenBonds.courseOffsets bond nCourses p.seed p.brickL p.brickB p.headJoint p.wildMinOverlap
@@ -380,6 +381,7 @@ struct BrickGenMeshStruct
 			local stm = undefined
 			local rect = undefined
 			local offs = p.startOffset
+			local hBond = undefined
 			if e[1] == #jamb then
 			(
 				-- jamb: strip x = depth into the wall, strip z = facade height
@@ -407,23 +409,50 @@ struct BrickGenMeshStruct
 				local ey = 0.5 * (a.y + b.y)
 				local x1 = amin a.x b.x
 				local x2 = amax a.x b.x
-				if e[5] > 0.0 then
+				local up = e[5] > 0.0
+				-- the facade course right below a sill / right above a head: the
+				-- first row of the strip continues exactly those bricks; further
+				-- rows into the wall alternate by half a stretcher (like a plan
+				-- view). The strip shows the bed faces: rows are B deep.
+				local pitchZ = p.brickH + p.bedJoint
+				local c = if up then ((ceil (ey / pitchZ)) as integer) - 1 \
+					else ((floor ((ey - p.brickH) / pitchZ)) as integer) + 1
+				c = amax 0 c
+				local fbond = BrickGenBonds.get p.bondType
+				local fOffs = BrickGenBonds.courseOffsets fbond (c + 1) p.seed p.brickL p.brickB p.headJoint p.wildMinOverlap
+				local cdef = BrickGenBonds.courseDef fbond c
+				local units = cdef[2]
+				local o = fOffs[c + 1] + p.startOffset
+				if up then
 				(
 					stm = matrix3 [1, 0, 0] [0, 0, -1] [0, 1, 0] [0, 0, ey]
 					rect = #([x1, 0, 0], [x2, 0, 0], [x2, T, 0], [x1, T, 0])
 				)
 				else
 				(
+					-- mirrored along x: units in reverse order, pattern start mirrored
 					stm = matrix3 [-1, 0, 0] [0, 0, 1] [0, 1, 0] [W, 0, ey]
 					rect = #([W - x2, 0, 0], [W - x1, 0, 0], [W - x1, T, 0], [W - x2, T, 0])
-					offs = W - p.startOffset - p.brickL
+					local period = 0.0
+					for u in units do period += BrickGenBonds.unitPitch u p.brickL p.brickB p.headJoint
+					units = for i = units.count to 1 by -1 collect units[i]
+					o = W - o - period + p.headJoint
 				)
+				offs = o
+				hBond = BrickGenBond id:#revealRow label:"" courses:#( \
+					#([0, 0, 0], units), #([0.5, 0, 0.5], units))
 			)
 			-- 0.5 mm towards the opening: covers sawn facade brick ends
 			-- instead of z-fighting with them
 			stm.row4 = stm.row4 - 0.5 * stm.row2
 			strip += 1
 			local q = copy p
+			if hBond != undefined do
+			(
+				q.bondOverride = hBond
+				q.brickH = p.brickB
+				q.bedJoint = p.headJoint
+			)
 			q.tm = stm * p.tm
 			q.segIndex = p.segIndex + 1000 + strip
 			q.uOffset = 0.0
