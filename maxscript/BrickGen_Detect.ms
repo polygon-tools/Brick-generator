@@ -139,11 +139,10 @@ struct BrickGenDetectStruct
 		local brickPx = pct gaps 50
 		local jointPx = amax 1.0 (coursePx - brickPx)
 		local s = brickPx / H -- px per mm
-		local pitches = #(L * s + jointPx, B * s + jointPx)
-		local tol = 0.12 * pitches[2]
 		local jw = jointPx
 
-		local cells = #()
+		-- per course: head-joint candidates #(x, strength)
+		local courses = #()
 		for bi = 1 to beds.count - 1 do
 		(
 			local y0 = beds[bi][2] + 1
@@ -176,19 +175,75 @@ struct BrickGenDetectStruct
 					local pen = 0.6 * (pct strong 50)
 					for c in cands do c[2] -= pen
 				)
-				local ch = bestChain cands pitches tol
+				append courses #(y0, y1, cands)
+			)
+		)
+
+		-- stretcher pitch measured in the photo: distances between strong
+		-- head-joint candidates vote for a pitch (a distance d may be one
+		-- stretcher or one header, so it votes for d and 2d); the brick
+		-- format only gives the search range. Header pitch = half of it.
+		local expect = L * s + jointPx
+		local lo = (0.55 * expect) as integer
+		local hi = (1.6 * expect) as integer
+		local votes = for i = 0 to hi + 1 collect 0.0
+		for crs in courses do
+		(
+			local xs = #()
+			for c in crs[3] where c[2] > 0.0 do append xs c[1]
+			for i = 1 to xs.count do
+				for j = i + 1 to (amin (i + 3) xs.count) do
+				(
+					local dd = xs[j] - xs[i]
+					for pv in #(dd, 2.0 * dd) do
+					(
+						local pi0 = (pv + 0.5) as integer
+						if pi0 >= lo and pi0 <= hi do votes[pi0 + 1] += 1.0
+					)
+				)
+		)
+		local ps = expect
+		local bestV = -1.0
+		for v = lo to hi do
+		(
+			local sm = 0.0
+			for k = v - 2 to v + 2 where k >= 0 and k <= hi + 1 do sm += votes[k + 1]
+			if sm > bestV do ( bestV = sm; ps = v as float )
+		)
+		local tol = 0.12 * 0.5 * ps
+
+		local cells = #()
+		for pass = 1 to 2 do
+		(
+			-- pass 2 only when headers are rare: then they are split
+			-- stretchers (stretcher bond), so chain stretchers only
+			local pitches = if pass == 1 then #(ps, 0.5 * ps) else #(ps)
+			local found = #()
+			for crs in courses do
+			(
+				local y0 = crs[1]
+				local y1 = crs[2]
+				local ch = bestChain crs[3] pitches tol
 				for i = 1 to ch.count - 1 do
 				(
 					local x0 = (ch[i] + 0.5 * jw + 0.5) as integer
 					local x1 = (ch[i + 1] - 0.5 * jw + 0.5) as integer
 					if (x1 - x0) >= 0.8 * (y1 - y0) do
 					(
-						local kind = if (x1 - x0 + 1) > 0.5 * (L + B) * s then "stretcher" else "header"
-						append cells #((x0 / fx + 0.5) as integer, (y0 / fy + 0.5) as integer, \
+						local kind = if (x1 - x0 + 1) > 0.75 * ps then "stretcher" else "header"
+						append found #((x0 / fx + 0.5) as integer, (y0 / fy + 0.5) as integer, \
 							((x1 - x0 + 1) / fx + 0.5) as integer, ((y1 - y0 + 1) / fy + 0.5) as integer, kind)
 					)
 				)
 			)
+			local nk = 0
+			for c in found where c[5] == "header" do nk += 1
+			if pass == 1 then
+			(
+				cells = found
+				if nk >= 0.2 * found.count do exit
+			)
+			else cells = found
 		)
 		cells
 	),
@@ -256,8 +311,8 @@ struct BrickGenDetectStruct
 	-- signature of the detection input: photo date + brick sizes
 	fn inputSig imgPath L B H bedJoint headJoint =
 	(
-		-- "v2": light-mortar detection; older caches are detected again
-		"v2|" + (getFileModDate imgPath) + "|" + (L as string) + "|" + (B as string) + "|" + \
+		-- "v3": light mortar, brick length from the photo; older caches are detected again
+		"v3|" + (getFileModDate imgPath) + "|" + (L as string) + "|" + (B as string) + "|" + \
 			(H as string) -- joints are measured in the photo, not taken from BrickGen
 	),
 

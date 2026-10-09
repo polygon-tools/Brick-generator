@@ -204,6 +204,28 @@ struct BrickGenMaterialStruct
 		)
 	),
 
+	-- After "Kies textuur": point the brick photo of an existing BrickGen
+	-- material to the new atlas' diffuse map (the relief uses the same bitmap).
+	-- Returns true when a material was updated.
+	fn setTexture mm atlas =
+	(
+		local b = (findSubs mm)[1]
+		local f = if atlas != undefined then BrickGenAtlasLib.mapPath atlas "diffuse" else undefined
+		if b == undefined or f == undefined or not (doesFileExist f) then false
+		else
+		(
+			local map = if classOf b == VRayMtl then b.texmap_diffuse
+				else if classOf b == PhysicalMaterial then b.base_color_map else undefined
+			if classOf map == Bitmaptexture then
+			(
+				map.fileName = f
+				map.name = getFilenameFile f
+				true
+			)
+			else false
+		)
+	),
+
 	-- Builds the material and assigns it to node. Returns the material.
 	fn makeFor node atlas matIdCount mortarMatId mortarCol:(color 120 115 108) gloss:30.0 \
 		reliefBrick:30.0 reliefMortar:60.0 disp:false =

@@ -90,9 +90,8 @@ def detect_gray(g, L, H, B=100.0, joint=12.0):
     brick_px = float(np.median([b[0] - a[1] - 1 for a, b in zip(beds, beds[1:])]))
     joint_px = max(1.0, course_px - brick_px)
     s = brick_px / H  # px per mm
-    pitches = [L * s + joint_px, B * s + joint_px]
-    tol = 0.12 * pitches[1]
-    cells = []
+    jw = joint_px
+    courses = []
     for (a0, a1), (b0, b1) in zip(beds, beds[1:]):
         y0, y1 = a1 + 1, b0 - 1
         if y1 - y0 < 8:
@@ -100,7 +99,6 @@ def detect_gray(g, L, H, B=100.0, joint=12.0):
         band = g[y0 + 2:y1 - 1]
         col = np.percentile(band, 85, axis=0)
         med = float(np.median(col))
-        jw = joint_px
         cands = []
         for r0, r1 in runs(col < np.percentile(col, 15), 2):
             if r1 - r0 > 2.5 * jw:
@@ -112,12 +110,39 @@ def detect_gray(g, L, H, B=100.0, joint=12.0):
             strong = sorted(c[1] for c in cands)[len(cands) // 2:]
             pen = 0.6 * float(np.median(strong))
             cands = [(x, st - pen) for x, st in cands]
-        for xa, xb in zip(*(lambda c: (c, c[1:]))(best_chain(cands, pitches, tol))):
-            x0, x1 = int(round(xa + jw / 2)), int(round(xb - jw / 2))
-            if x1 - x0 >= 0.8 * (y1 - y0):
-                cells.append([x0, y0, x1 - x0 + 1, y1 - y0 + 1])
+        courses.append((y0, y1, cands))
+    # stretcher pitch measured in the photo: distances between strong joint
+    # candidates vote for d and 2d; the brick format only sets the range.
+    expect = L * s + joint_px
+    lo, hi = int(0.55 * expect), int(1.6 * expect)
+    votes = np.zeros(hi + 2)
+    for y0, y1, c in courses:
+        xs = [x for x, st in c if st > 0]
+        for i in range(len(xs)):
+            for j in range(i + 1, min(i + 4, len(xs))):
+                for pv in (xs[j] - xs[i], 2 * (xs[j] - xs[i])):
+                    if lo <= round(pv) <= hi:
+                        votes[int(round(pv))] += 1
+    sm = np.convolve(votes, np.ones(5), "same")
+    ps = float(np.argmax(sm[lo:hi + 1]) + lo)
+    tol = 0.12 * 0.5 * ps
+
+    def chain_cells(pitches):
+        out = []
+        for y0, y1, c in courses:
+            ch = best_chain(c, pitches, tol)
+            for xa, xb in zip(ch, ch[1:]):
+                x0, x1 = int(round(xa + jw / 2)), int(round(xb - jw / 2))
+                if x1 - x0 >= 0.8 * (y1 - y0):
+                    out.append([x0, y0, x1 - x0 + 1, y1 - y0 + 1])
+        return out
+
+    cells = chain_cells([ps, ps / 2])
+    # rare headers are split stretchers (stretcher bond): chain stretchers only
+    if sum(c[2] <= 0.75 * ps for c in cells) < 0.2 * len(cells):
+        cells = chain_cells([ps])
     # stretcher / header by width
-    split = 0.5 * (L + B) * s
+    split = 0.75 * ps
     out = []
     for i, (x, y, cw, ch) in enumerate(cells):
         out.append({"id": i, "x": int(x), "y": int(y), "w": int(cw), "h": int(ch),
