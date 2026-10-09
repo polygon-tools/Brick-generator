@@ -144,8 +144,10 @@ plugin simpleMeshMod BrickGenMod
 		atlasFile type:#string ui:edtAtlasPath default:""
 		atlasFlip type:#boolean ui:chkAtlasFlip default:true
 		atlasRotate type:#boolean ui:chkAtlasRotate default:true
-		mortarColor type:#color ui:cpMortar default:(color 120 115 108)
-		brickGloss type:#float ui:spnGloss default:30.0
+		-- not bound to the UI: the material holds the live values (changing a
+		-- parameter would re-evaluate the modifier). Kept for older scenes.
+		mortarColor type:#color default:(color 120 115 108)
+		brickGloss type:#float default:30.0
 	)
 	rollout rMat "Materiaal en textuur"
 	(
@@ -160,24 +162,46 @@ plugin simpleMeshMod BrickGenMod
 			checkbox chkAtlasFlip "Random spiegelen"
 			checkbox chkAtlasRotate "Random 180 graden draaien"
 		)
-		group "Materiaal"
+		group "Materiaal (past het materiaal meteen aan)"
 		(
 			colorpicker cpMortar "Voegkleur:" color:(color 120 115 108) modal:false
 			spinner spnGloss "Glans steen (%):" type:#float range:[0, 100, 30]
+			spinner spnReliefBrick "Relief steen (%):" type:#float range:[0, 200, 30]
+			spinner spnReliefMortar "Relief voeg (%):" type:#float range:[0, 200, 60]
+			checkbox chkDisp "Displacement bij render"
 		)
 		button btnMakeMat "Maak materiaal" width:140 height:26
 
-		-- colour and gloss also update a material that was already made
-		fn updateMaterial col gloss =
+		-- These controls only change the material (never the geometry), so they
+		-- are not bound to parameters.
+		fn bgNode = ( refs.dependentNodes this firstOnly:true )
+		fn updateMaterial =
 		(
-			local node = refs.dependentNodes this firstOnly:true
-			if node != undefined do BrickGenMaterial.updateColors node.material col gloss
+			local node = bgNode()
+			if node != undefined do BrickGenMaterial.update node.material cpMortar.color spnGloss.value \
+				spnReliefBrick.value spnReliefMortar.value chkDisp.checked
 		)
-		on cpMortar changed c do updateMaterial c brickGloss
-		on spnGloss changed v do updateMaterial mortarColor v
+		fn readMaterial =
+		(
+			local node = bgNode()
+			local st = if node != undefined then BrickGenMaterial.readSettings node.material else undefined
+			if st != undefined do
+			(
+				cpMortar.color = st[1]
+				spnGloss.value = st[2]
+				spnReliefBrick.value = st[3]
+				spnReliefMortar.value = st[4]
+				chkDisp.checked = st[5]
+			)
+		)
+		on cpMortar changed c do updateMaterial()
+		on spnGloss changed v do updateMaterial()
+		on spnReliefBrick changed v do updateMaterial()
+		on spnReliefMortar changed v do updateMaterial()
+		on chkDisp changed v do updateMaterial()
 
 		fn refresh = ( edtAtlas.text = if atlasFile == "" then "(geen atlas)" else filenameFromPath atlasFile )
-		on rMat open do refresh()
+		on rMat open do ( refresh(); readMaterial() )
 		on btnAtlas pressed do
 		(
 			local startDir = if atlasFile != "" then getFilenamePath atlasFile
@@ -212,7 +236,8 @@ plugin simpleMeshMod BrickGenMod
 				not (doesFileExist (BrickGenAtlasLib.mapPath atlas "diffuse")) do
 				messageBox ("Textuur niet gevonden:\n" + (BrickGenAtlasLib.mapPath atlas "diffuse") + \
 					"\n\nZet de afbeelding naast het atlas-bestand.") title:"BrickGen"
-			BrickGenMaterial.makeFor node atlas matIdCount mortarMatId mortarCol:mortarColor gloss:brickGloss
+			BrickGenMaterial.makeFor node atlas matIdCount mortarMatId mortarCol:cpMortar.color gloss:spnGloss.value \
+				reliefBrick:spnReliefBrick.value reliefMortar:spnReliefMortar.value disp:chkDisp.checked
 		)
 	)
 
@@ -252,7 +277,8 @@ plugin simpleMeshMod BrickGenMod
 
 			local ss = stringStream ""
 			format "%|" s to:ss
-			for n in (getPropNames this) do format "%=%|" n (getProperty this n) to:ss
+			-- material-only parameters do not change the geometry
+			for n in (getPropNames this) where n != #mortarColor and n != #brickGloss do format "%=%|" n (getProperty this n) to:ss
 			for poly in raw do (for pt in poly do format "%," pt to:ss; format ";" to:ss)
 			if atlasFile != "" and doesFileExist atlasFile do format "%" (getFileModDate atlasFile) to:ss
 			local sig = ss as string
