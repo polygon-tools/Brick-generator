@@ -13,7 +13,9 @@ struct BrickGenDetectStruct
 	-- percentile with linear interpolation (like numpy); p in 0..100
 	fn pct arr p =
 	(
-		local a = sort (copy arr)
+		-- (no "copy": on an array it returned OK in 3ds Max 2026)
+		local a = for v in arr collect v
+		sort a
 		local f = (p / 100.0) * (a.count - 1)
 		local i = (floor f) as integer
 		if i + 1 >= a.count then a[a.count] else a[i + 1] + (f - i) * (a[i + 2] - a[i + 1])
