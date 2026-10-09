@@ -217,6 +217,10 @@ plugin simpleMeshMod BrickGenMod
 					atlasFile = f
 					try (notifyDependents this) catch ()
 					refresh()
+					-- an existing BrickGen material gets the new photo too
+					local node = bgNode()
+					if node != undefined and (BrickGenMaterial.setTexture node.material (BrickGenAtlasLib.get js)) do
+						format "BrickGen: materiaal gebruikt nu %\n" (filenameFromPath f)
 				)
 			)
 		)
