@@ -13,7 +13,7 @@ struct BrickGenDetectStruct
 	-- percentile with linear interpolation (like numpy); p in 0..100
 	fn pct arr p =
 	(
-		local a = sort (copy arr #nodeep)
+		local a = sort (copy arr)
 		local f = (p / 100.0) * (a.count - 1)
 		local i = (floor f) as integer
 		if i + 1 >= a.count then a[a.count] else a[i + 1] + (f - i) * (a[i + 2] - a[i + 1])
@@ -122,10 +122,14 @@ struct BrickGenDetectStruct
 		if beds.count < 3 do return undefined
 		d = for i = 1 to beds.count - 1 collect 0.5 * (beds[i + 1][1] + beds[i + 1][2] - beds[i][1] - beds[i][2])
 		local coursePx = pct d 50
-		local s = coursePx / (H + bedJoint) -- px per mm
-		local pitches = #((L + headJoint) * s, (B + headJoint) * s)
+		-- brick height and joint measured in the photo itself (the joints of
+		-- the photo need not match the joints set in BrickGen)
+		local brickPx = pct (for i = 1 to beds.count - 1 collect beds[i + 1][1] - beds[i][2] - 1) 50
+		local jointPx = amax 1.0 (coursePx - brickPx)
+		local s = brickPx / H -- px per mm
+		local pitches = #(L * s + jointPx, B * s + jointPx)
 		local tol = 0.12 * pitches[2]
-		local jw = headJoint * s
+		local jw = jointPx
 
 		local cells = #()
 		for bi = 1 to beds.count - 1 do
@@ -210,7 +214,7 @@ struct BrickGenDetectStruct
 	fn inputSig imgPath L B H bedJoint headJoint =
 	(
 		(getFileModDate imgPath) + "|" + (L as string) + "|" + (B as string) + "|" + \
-			(H as string) + "|" + (bedJoint as string) + "|" + (headJoint as string)
+			(H as string) -- joints are measured in the photo, not taken from BrickGen
 	),
 
 	-- The atlas JSON for a photo: from the cache when the photo and brick sizes

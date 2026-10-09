@@ -58,10 +58,24 @@ def detect(path, L, H, B=100.0, joint=12.0):
     # bed joints
     row = np.percentile(g, 80, axis=1)
     beds = runs(row < np.percentile(row, 18), 2)
+    # drop spurious beds (dark specks inside a course): keep the darker one
+    m0 = float(np.median(np.diff([(a + b) / 2 for a, b in beds])))
+    keep = [beds[0]]
+    for b in beds[1:]:
+        if (b[0] + b[1]) / 2 - (keep[-1][0] + keep[-1][1]) / 2 < 0.6 * m0:
+            if row[b[0]:b[1] + 1].min() < row[keep[-1][0]:keep[-1][1] + 1].min():
+                keep[-1] = b
+        else:
+            keep.append(b)
+    beds = keep
     centres = [(a + b) / 2 for a, b in beds]
     course_px = float(np.median(np.diff(centres)))
-    s = course_px / (H + joint)  # px per mm
-    pitches = [(L + joint) * s, (B + joint) * s]
+    # brick height and joint measured in the photo (the --joint argument is
+    # no longer needed for the scale)
+    brick_px = float(np.median([b[0] - a[1] - 1 for a, b in zip(beds, beds[1:])]))
+    joint_px = max(1.0, course_px - brick_px)
+    s = brick_px / H  # px per mm
+    pitches = [L * s + joint_px, B * s + joint_px]
     tol = 0.12 * pitches[1]
     cells = []
     for (a0, a1), (b0, b1) in zip(beds, beds[1:]):
@@ -71,7 +85,7 @@ def detect(path, L, H, B=100.0, joint=12.0):
         band = g[y0 + 2:y1 - 1]
         col = np.percentile(band, 85, axis=0)
         med = float(np.median(col))
-        jw = joint * s
+        jw = joint_px
         cands = []
         for r0, r1 in runs(col < np.percentile(col, 15), 2):
             if r1 - r0 > 2.5 * jw:

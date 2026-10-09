@@ -22,6 +22,7 @@ fn BrickGen_splinePolygons node =
 )
 
 global BrickGenModWarned = false
+global BrickGenCacheWarned = false
 
 plugin simpleMeshMod BrickGenMod
 	name:"BrickGen"
@@ -258,6 +259,7 @@ plugin simpleMeshMod BrickGenMod
 	-- Cache: the geometry is only rebuilt when a parameter or the spline changes.
 	local cacheSig = ""
 	local cacheBuf = undefined
+	local cacheMesh = undefined -- finished TriMesh of cacheBuf (with UVs)
 	local lastAtlasInfo = "geen atlas"
 
 
@@ -266,6 +268,7 @@ plugin simpleMeshMod BrickGenMod
 	(
 		local t0 = timeStamp()
 		local buf = BrickGenMeshBuffer()
+		local fromCache = false
 		local node = refs.dependentNodes this firstOnly:true
 		local base = if node != undefined then node.baseObject else undefined
 		if base != undefined and (isKindOf base SplineShape or isKindOf base line) then
@@ -281,7 +284,7 @@ plugin simpleMeshMod BrickGenMod
 			for poly in raw do (for pt in poly do format "%," pt to:ss; format ";" to:ss)
 			if atlasFile != "" and doesFileExist atlasFile do format "%" (getFileModDate atlasFile) to:ss
 			local sig = ss as string
-			if sig == cacheSig and cacheBuf != undefined then buf = cacheBuf
+			if sig == cacheSig and cacheBuf != undefined then ( buf = cacheBuf; fromCache = true )
 			else
 			(
 				-- bounding box in mm
@@ -349,7 +352,35 @@ plugin simpleMeshMod BrickGenMod
 		)
 
 		local tGeo = timeStamp() - t0
-		local tApply = BrickGenMesh.applyToMesh mesh buf
+		-- unchanged: copy the finished mesh (one native call) instead of
+		-- writing all vertices and UVs again; verified, else rebuilt
+		local tApply = undefined
+		if fromCache and cacheMesh != undefined do
+		(
+			local ta = timeStamp()
+			local ok = false
+			try
+			(
+				setMesh mesh numverts:0 numfaces:0
+				meshop.attach mesh cacheMesh
+				ok = mesh.numverts == cacheMesh.numverts and mesh.numfaces == cacheMesh.numfaces and \
+					(meshop.getNumMaps mesh) >= 3 and (meshop.getMapSupport mesh 1) and \
+					(distance (meshop.getMapVert mesh 1 1) (meshop.getMapVert cacheMesh 1 1)) < 0.0001 and \
+					(getFaceMatID mesh 1) == (getFaceMatID cacheMesh 1)
+			)
+			catch ()
+			if ok then tApply = #(timeStamp() - ta, 0, 0)
+			else if not BrickGenCacheWarned do
+			(
+				BrickGenCacheWarned = true
+				format "BrickGen: snelle cache werkt niet in deze 3ds Max-versie, volledige opbouw\n"
+			)
+		)
+		if tApply == undefined do
+		(
+			tApply = BrickGenMesh.applyToMesh mesh buf
+			cacheMesh = if buf.faces.count > 0 then copy mesh else undefined
+		)
 		local ms = timeStamp() - t0
 		BrickGenSettings.lastBuildMs = ms
 		BrickGenSettings.lastTris = buf.faces.count
