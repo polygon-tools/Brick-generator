@@ -373,7 +373,10 @@ plugin simpleMeshMod BrickGenMod
 			else if not BrickGenCacheWarned do
 			(
 				BrickGenCacheWarned = true
-				format "BrickGen: snelle cache werkt niet in deze 3ds Max-versie, volledige opbouw\n"
+				try ( format "BrickGen: snelle cache werkt niet, volledige opbouw (verts % / %, maps %, kanaal1 %, ID % / %)\n" \
+					mesh.numverts cacheMesh.numverts (meshop.getNumMaps mesh) (meshop.getMapSupport mesh 1) \
+					(try (getFaceMatID mesh 1) catch "?") (try (getFaceMatID cacheMesh 1) catch "?") )
+				catch ( format "BrickGen: snelle cache werkt niet, volledige opbouw\n" )
 			)
 		)
 		if tApply == undefined do
