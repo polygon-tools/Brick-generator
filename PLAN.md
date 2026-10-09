@@ -352,8 +352,8 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 
 > Status: `BrickGen_Detect.ms` gecodeerd in pure MAXScript in plaats van C# (runtime-compilatie van C# is onzeker sinds 3ds Max op .NET 8 draait). Werkt op een verkleinde kopie (max 900 px): in een Python-simulatie van exact dit algoritme 327 van de 340 cellen op `baksteen_rood_01.jpg`. Extra t.o.v. de referentie: valse lintvoegen (donkere vlekken) worden weggefilterd. Displacement-optie geschrapt na test (bump volstaat).
 
-- [ ] Detectie in 3ds Max (`BrickGen_Detect.ms`), getest op de bestaande foto (~330 cellen, < 10 s).
-- [ ] "Kies textuur..." voor jpg/png + cache naast de foto (of in %TEMP%\BrickGen als die map niet schrijfbaar is).
+- [x] Detectie in 3ds Max (`BrickGen_Detect.ms`), getest op de bestaande foto: 360 cellen in 3,2 s, werkt met Vlaams en halfsteens.
+- [x] "Kies textuur..." voor jpg/png + cache naast de foto (of in %TEMP%\BrickGen als die map niet schrijfbaar is).
 - [ ] Controlevenster met overlay en cellen aan/uit.
 - [ ] Herkennen van normal/roughness-maps op naam.
 
