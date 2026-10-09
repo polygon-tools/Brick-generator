@@ -80,13 +80,13 @@ struct BrickGenDetectStruct
 
 	-- Grey values of the photo on a reduced copy: #(g, W, H, sw, fs, fx, fy)
 	-- with g[row][col], or undefined.
-	fn readGray imgPath =
+	fn readGray imgPath dim =
 	(
 		local src = openBitMap imgPath
 		if src == undefined do return undefined
 		local W = src.width
 		local Hh = src.height
-		local fs = amin 1.0 (maxDim / ((amax W Hh) as float))
+		local fs = amin 1.0 (dim / ((amax W Hh) as float))
 		local sw = amax 1 ((W * fs) as integer)
 		local sh = amax 1 ((Hh * fs) as integer)
 		local sm = src
@@ -102,6 +102,15 @@ struct BrickGenDetectStruct
 		#(g, W, Hh, sw, fs, sw as float / W, sh as float / Hh)
 	),
 
+	-- number of histogram entries within 5% of center (cum = prefix sums)
+	fn windowCount cum center hi =
+	(
+		local t = amax 1.0 (0.05 * center)
+		local a0 = amax 0 ((center - t) as integer)
+		local a1 = amin (hi + 1) ((center + t) as integer)
+		if a1 < a0 then 0.0 else cum[a1 + 2] - cum[a0 + 1]
+	),
+
 	-- Brick cells in grey image g, assuming joints darker than the bricks.
 	-- Returns #(x, y, w, h, kind) per cell in full-size pixels (maybe empty).
 	fn detectGray g sw fs fx fy L B H =
@@ -113,7 +122,7 @@ struct BrickGenDetectStruct
 		local thr = pct rowp 18
 		local rowMask = maskBelow rowp thr
 		local beds = runs rowMask mn
-		if beds.count < 3 do return #()
+		if beds.count < 3 do return #(#(), 0.0, 0.0)
 		local d = for i = 1 to beds.count - 1 collect 0.5 * (beds[i + 1][1] + beds[i + 1][2] - beds[i][1] - beds[i][2])
 		local m0 = pct d 50
 		-- drop spurious beds (dark specks inside a course): keep the darker one
@@ -130,9 +139,14 @@ struct BrickGenDetectStruct
 			else append keep bed
 		)
 		beds = keep
-		if beds.count < 3 do return #()
+		if beds.count < 3 do return #(#(), 0.0, 0.0)
 		d = for i = 1 to beds.count - 1 collect 0.5 * (beds[i + 1][1] + beds[i + 1][2] - beds[i][1] - beds[i][2])
 		local coursePx = pct d 50
+		-- regularity of the bed joints (1 = all equally spaced): tells the
+		-- right joint colour (dark/light) from the wrong one
+		local nReg = 0
+		for v in d where (abs (v - coursePx)) <= 0.15 * coursePx do nReg += 1
+		local reg = nReg as float / d.count
 		-- brick height and joint measured in the photo itself (the joints of
 		-- the photo need not match the joints set in BrickGen)
 		local gaps = for i = 1 to beds.count - 1 collect beds[i + 1][1] - beds[i][2] - 1
@@ -183,41 +197,47 @@ struct BrickGenDetectStruct
 		-- head-joint candidates vote for a pitch (a distance d may be one
 		-- stretcher or one header, so it votes for d and 2d); the brick
 		-- format only gives the search range. Header pitch = half of it.
+		-- stretcher pitch measured in the photo: histogram of the distances
+		-- between neighbouring strong head-joint candidates. A pitch P scores
+		-- the distances near P plus (at most as many) near P/2 (headers);
+		-- the brick format only weighs the choice (linear bricks are allowed).
 		local expect = L * s + jointPx
-		local lo = (0.55 * expect) as integer
-		local hi = (1.6 * expect) as integer
-		local votes = for i = 0 to hi + 1 collect 0.0
+		local lo = amax 2 ((0.5 * expect) as integer)
+		local hi = (4.5 * expect) as integer
+		local hist = for i = 0 to hi + 1 collect 0.0
 		for crs in courses do
 		(
 			local xs = #()
 			for c in crs[3] where c[2] > 0.0 do append xs c[1]
-			for i = 1 to xs.count do
-				for j = i + 1 to (amin (i + 3) xs.count) do
-				(
-					local dd = xs[j] - xs[i]
-					for pv in #(dd, 2.0 * dd) do
-					(
-						local pi0 = (pv + 0.5) as integer
-						if pi0 >= lo and pi0 <= hi do votes[pi0 + 1] += 1.0
-					)
-				)
+			for i = 1 to xs.count - 1 do
+			(
+				local di = (xs[i + 1] - xs[i] + 0.5) as integer
+				if di >= 0 and di <= hi do hist[di + 1] += 1.0
+			)
 		)
+		-- prefix sums: cum[k + 1] = hist[1] + ... + hist[k]
+		local cum = #(0.0)
+		for v in hist do append cum (cum[cum.count] + v)
 		local ps = expect
 		local bestV = -1.0
-		for v = lo to hi do
+		for pv = lo to hi do
 		(
-			local sm = 0.0
-			for k = v - 2 to v + 2 where k >= 0 and k <= hi + 1 do sm += votes[k + 1]
-			if sm > bestV do ( bestV = sm; ps = v as float )
+			local wP = windowCount cum pv hi
+			local wH = windowCount cum (0.5 * pv) hi
+			local sc = (wP + (amin wP wH)) / (1.0 + 0.3 * (abs (log (pv / expect))))
+			if sc > bestV do ( bestV = sc; ps = pv as float )
 		)
 		local tol = 0.12 * 0.5 * ps
+		-- headers only when header-sized spacings are common (Flemish,
+		-- English bond); otherwise short pieces are split stretchers
+		local hasHeaders = (windowCount cum (0.5 * ps) hi) >= 0.5 * (windowCount cum ps hi)
 
 		local cells = #()
 		for pass = 1 to 2 do
 		(
 			-- pass 2 only when headers are rare: then they are split
 			-- stretchers (stretcher bond), so chain stretchers only
-			local pitches = if pass == 1 then #(ps, 0.5 * ps) else #(ps)
+			local pitches = if pass == 1 and hasHeaders then #(ps, 0.5 * ps) else #(ps)
 			local found = #()
 			for crs in courses do
 			(
@@ -245,30 +265,89 @@ struct BrickGenDetectStruct
 			)
 			else cells = found
 		)
-		cells
+
+		-- bricks of free length (e.g. linear bricks of varying length): when
+		-- the fixed pitches explain little of the photo, take the strongest
+		-- head joints at any spacing instead, if that covers more.
+		local covered = 0.0
+		for c in cells do covered += c[3] * c[4] * fx * fy
+		if covered < 0.35 * sw * g.count do
+		(
+			local allSt = #()
+			for crs in courses do for c in crs[3] where c[2] > 0.0 do append allSt c[2]
+			if allSt.count > 0 do
+			(
+				local thr2 = 0.5 * (pct allSt 90)
+				local freeCells = #()
+				local freeArea = 0.0
+				for crs in courses do
+				(
+					local y0 = crs[1]
+					local y1 = crs[2]
+					local m = #()
+					for c in crs[3] where c[2] >= thr2 do
+						if m.count == 0 or (c[1] - m[m.count]) >= 1.5 * brickPx do append m c[1]
+					for i = 1 to m.count - 1 do
+					(
+						local x0 = (m[i] + 0.5 * jw + 0.5) as integer
+						local x1 = (m[i + 1] - 0.5 * jw + 0.5) as integer
+						if (x1 - x0) >= 1.5 * (y1 - y0) do
+						(
+							append freeCells #((x0 / fx + 0.5) as integer, (y0 / fy + 0.5) as integer, \
+								((x1 - x0 + 1) / fx + 0.5) as integer, ((y1 - y0 + 1) / fy + 0.5) as integer, "stretcher")
+							freeArea += (x1 - x0 + 1) * (y1 - y0 + 1)
+						)
+					)
+				)
+				if freeArea > covered do cells = freeCells
+			)
+		)
+		#(cells, reg, coursePx)
 	),
 
 	-- Detect the brick cells. Sizes in mm (the real brick). Joints may be
 	-- darker (usual) or lighter (light mortar) than the bricks: both are tried
 	-- and the result covering the largest area wins.
 	-- Returns #(imageWidth, imageHeight, cells) or undefined.
-	fn detect imgPath L B H bedJoint headJoint =
+	-- One detection on a photo read at most dim px: #(W, H, cells, coursePx)
+	-- with the better joint colour (largest area x regular bed joints).
+	fn detectAt imgPath L B H dim =
 	(
-		local info = readGray imgPath
+		local info = readGray imgPath dim
 		if info == undefined do return undefined
 		local g = info[1]
-		local best = #()
-		local bestArea = 0.0
+		local best = #(#(), 0.0, 0.0)
+		local bestScore = -1.0
 		for pass = 1 to 2 do
 		(
 			local gp = g
 			if pass == 2 do gp = for r in g collect (for v in r collect 255.0 - v)
-			local cells = detectGray gp info[4] info[5] info[6] info[7] L B H
+			local res = detectGray gp info[4] info[5] info[6] info[7] L B H
 			local area = 0.0
-			for c in cells do area += c[3] * c[4]
-			if area > bestArea do ( best = cells; bestArea = area )
+			for c in res[1] do area += c[3] * c[4]
+			local score = area * res[2] * res[2]
+			if score > bestScore do ( best = res; bestScore = score )
 		)
-		#(info[2], info[3], best)
+		#(info[2], info[3], best[1], best[3] / info[5])
+	),
+
+	-- Detect the brick cells. Sizes in mm (the real brick). Joints may be
+	-- darker (usual) or lighter (light mortar) than the bricks: both are
+	-- tried. Small courses (thin joints) are detected again at a higher
+	-- resolution. Returns #(imageWidth, imageHeight, cells) or undefined.
+	fn detect imgPath L B H bedJoint headJoint =
+	(
+		local res = detectAt imgPath L B H maxDim
+		if res == undefined do return undefined
+		-- course height in the reduced photo; aim for about 22 px
+		local cpReduced = res[4] * (amin 1.0 (maxDim / ((amax res[1] res[2]) as float)))
+		if cpReduced > 0.0 and cpReduced < 18.0 and (amax res[1] res[2]) > maxDim do
+		(
+			local dim = amin 1800 ((maxDim * 22.0 / cpReduced) as integer)
+			local res2 = detectAt imgPath L B H dim
+			if res2 != undefined and res2[3].count > 0 do res = res2
+		)
+		#(res[1], res[2], res[3])
 	),
 
 	fn jsonStr s = ( "\"" + (substituteString (substituteString s "\\" "\\\\") "\"" "\\\"") + "\"" ),
@@ -311,8 +390,8 @@ struct BrickGenDetectStruct
 	-- signature of the detection input: photo date + brick sizes
 	fn inputSig imgPath L B H bedJoint headJoint =
 	(
-		-- "v3": light mortar, brick length from the photo; older caches are detected again
-		"v3|" + (getFileModDate imgPath) + "|" + (L as string) + "|" + (B as string) + "|" + \
+		-- "v4": detection version; older caches are detected again
+		"v4|" + (getFileModDate imgPath) + "|" + (L as string) + "|" + (B as string) + "|" + \
 			(H as string) -- joints are measured in the photo, not taken from BrickGen
 	),
 
