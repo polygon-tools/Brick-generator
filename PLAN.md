@@ -345,6 +345,8 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 > UI-indeling modifier (na test fase 3): Gevel (+ dagkanten) · Verband · Steen · Steen: textuur en materiaal · Steen: vorm en imperfectie · Voeg (+ kleur/relief) · Weergave. Parameterblokken behouden hun volgorde; enkel de rollouts zijn herschikt.
 > Horizontale dagkanten (dorpel/latei): tonen het legvlak (rijen B diep); de eerste rij zet exact de gevellaag eronder/erboven voort, volgende rijen verspringen een halve strek.
 
+> Na test met 6 texturen: cellen worden 8% van de steenhoogte bijgesneden (geen voegrand in de steen); afgebroken hoekjes (% stenen, grootte) zonder extra geometrie (RNG-kanaal 4). Snelheid: de geometrie van de modifier wordt gebouwd in C# (`bin/BrickGen.Core.dll`, netstandard2.0, geladen met `dotNet.loadAssembly`; terugval op MAXScript). Test hier: 2000-2600 stenen met dagkanten in 10-20 ms. Wat in MAXScript blijft: arrays omzetten, setMesh, smoothing en UV's (samen ~1-2 s voor 15.000 stenen). Kromme stenen vragen extra vertices per steen: later, als optie.
+
 ### Fase 3 — Textuur kiezen zonder JSON (vervangt de webtool als eerste stap)
 > Beslissing (na fase 2-test): gebruikers kiezen gewoon een **jpg/png**; geen JSON, geen aparte webtool nodig voor het gewone geval.
 > - **Kies textuur...** in de modifier aanvaardt jpg/png/tif. BrickGen detecteert de stenen automatisch in 3ds Max (algoritme van `tools/detect_atlas.py`, in C# dat 3ds Max zelf compileert via `dotNet`, dus geen Python nodig; doel < 2 s voor een foto van 2000 px).

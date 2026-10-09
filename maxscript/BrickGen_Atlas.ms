@@ -51,6 +51,10 @@ struct BrickGenAtlasLibStruct
 			local cw = (BrickGenJson_get c "w" 1) as float
 			local ch = (BrickGenJson_get c "h" 1) as float
 			-- pixel origin top-left -> UV origin bottom-left
+			-- trim a margin (8% of the brick height) on every side: detected
+			-- cells may include a sliver of joint or its shadow
+			local trim = 0.08 * ch
+			if cw > 4.0 * trim and ch > 4.0 * trim do ( cx += trim; cy += trim; cw -= 2.0 * trim; ch -= 2.0 * trim )
 			local cell = #(cx / imgW, 1.0 - (cy + ch) / imgH, (cx + cw) / imgW, 1.0 - cy / imgH, cw / ch)
 			if (BrickGenJson_get c "kind" "stretcher") == "header" then append a.headers cell
 			else append a.stretchers cell
@@ -87,7 +91,26 @@ struct BrickGenAtlasLibStruct
 	(
 		local pool = if (unit == #K or unit == #KM) and atlas.headers.count > 0 then atlas.headers
 			else if atlas.stretchers.count > 0 then atlas.stretchers else atlas.headers
-		local cell = pool[amin pool.count (1 + ((floor (r.x * pool.count)) as integer))]
+		-- a cell much shorter than the brick would be cropped to a thin strip
+		-- and magnified a lot: look further (deterministically) for a cell at
+		-- least 80% as elongated as the brick; else keep the most elongated
+		local n = pool.count
+		local i0 = amin n (1 + ((floor (r.x * n)) as integer))
+		local cell = pool[i0]
+		if cell[5] < 0.8 * aspect do
+		(
+			local bestCell = cell
+			local tries = amin n 40
+			local k = 1
+			while k < tries and cell[5] < 0.8 * aspect do
+			(
+				local c2 = pool[(mod (i0 - 1 + k * 7919) n) as integer + 1]
+				if c2[5] > bestCell[5] do bestCell = c2
+				if c2[5] >= 0.8 * aspect do cell = c2
+				k += 1
+			)
+			if cell[5] < 0.8 * aspect do cell = bestCell
+		)
 		local u0 = cell[1]
 		local v0 = cell[2]
 		local du = cell[3] - cell[1]

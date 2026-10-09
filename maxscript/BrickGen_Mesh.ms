@@ -30,13 +30,16 @@ struct BrickGenWallParams
 	segIndex = 0,     -- piece number, varies the randomness per segment
 	-- texture atlas (BrickGen_Atlas.ms); undefined = plain 0..1 UV per brick
 	atlas = undefined, atlasFlip = true, atlasRotate = true,
-	bondOverride = undefined -- a BrickGenBond used instead of bondType (reveal strips)
+	bondOverride = undefined, -- a BrickGenBond used instead of bondType (reveal strips)
+	chipChance = 0.0, chipSize = 6.0 -- broken corners: fraction of bricks, size in mm
 )
 
 struct BrickGenMeshBuffer
 (
 	verts = #(), faces = #(), matIDs = #(), smooth = #(), uv1 = #(), uv2 = #(),
-	brickCount = 0
+	brickCount = 0,
+	uvFlat = false, -- uv1/uv2 as flat u, v, u, v ... (C# builder) instead of point3
+	nativeMs = 0.0  -- time spent in the C# builder
 )
 
 struct BrickGenMeshStruct
@@ -91,7 +94,7 @@ struct BrickGenMeshStruct
 	--
 	-- RNG channels (each gives three values, see BrickGenRNG.u01x3):
 	--   1: size L, size H, chamfer      2: depth, rotation, material ID
-	--   3: atlas cell, flip, rotate 180
+	--   3: atlas cell, flip, rotate 180    4: broken corner chance, which, size
 	--   11..18: corner jitter x, z, y for front vertex 1..8
 	fn addBrick buf p idx x0 x1 z0 z1 nomX0 nomL nomZ0 clipL clipR clipT clipB:false unit:#S =
 	(
@@ -147,6 +150,30 @@ struct BrickGenMeshStruct
 
 		-- back vertices follow the outer rim
 		for v = 5 to 8 do append pts [pts[v].x, depth, pts[v].z]
+
+		-- 3b. broken corner (RNG channel 4: chance, which corner, size): the
+		-- front and rim vertex of one free corner move inwards and back, so
+		-- a piece seems knocked off. Back vertices stay: no extra geometry.
+		if jitter and p.chipChance > 0.0 and p.chipSize > 0.0 do
+		(
+			local r4 = R.u01x3 key 4
+			if r4.x < p.chipChance do
+			(
+				local k = 1 + ((floor (r4.y * 4.0)) as integer)
+				if k > 4 do k = 4
+				local onLeft = (k == 1 or k == 4)
+				local onTop = (k == 3 or k == 4)
+				local sawn = (if onLeft then clipL else clipR) or (if onTop then clipT else clipB)
+				if not sawn do
+				(
+					local sz = amin (p.chipSize * (0.5 + r4.z)) (0.3 * (amin (x1 - x0) (z1 - z0)))
+					local sx = if onLeft then 1.0 else -1.0
+					local sy = if onTop then -1.0 else 1.0
+					pts[k] = pts[k] + [sx * sz, 0.6 * sz, sy * sz]
+					pts[k + 4] = pts[k + 4] + [sx * sz * 0.8, 0.3 * sz, sy * sz * 0.8]
+				)
+			)
+		)
 
 		-- channel 1 before depth/rotation, so the texture moves with the brick
 		local invL = 1.0 / nomL
@@ -525,14 +552,10 @@ struct BrickGenMeshStruct
 			local uv = if ch == 1 then buf.uv1 else buf.uv2
 			meshop.setMapSupport m ch true
 			meshop.defaultMapFaces m ch
-			for i = 1 to uv.count do meshop.setMapVert m ch i uv[i]
-		)
-		-- self-check: the first UV must be ours
-		if buf.uv1.count > 0 do
-		(
-			local chk = meshop.getMapVert m 1 1
-			if (distance chk buf.uv1[1]) > 0.0001 do
-				format "BrickGen: UV-kanaal 1 klopt niet (mesh % / verwacht %)\n" chk buf.uv1[1]
+			if buf.uvFlat then
+				for i = 1 to uv.count / 2 do meshop.setMapVert m ch i [uv[2 * i - 1], uv[2 * i], 0.0]
+			else
+				for i = 1 to uv.count do meshop.setMapVert m ch i uv[i]
 		)
 		local t3 = timeStamp()
 		#(t1 - t0, t2 - t1, t3 - t2)
