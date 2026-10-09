@@ -159,6 +159,7 @@ plugin simpleMeshMod BrickGenMod
 			edittext edtAtlasPath "" readOnly:true visible:false
 			button btnAtlas "Kies textuur..." width:90 across:2
 			button btnAtlasClear "Geen" width:50
+			button btnAtlasCheck "Stenen controleren..." width:140
 			checkbox chkAtlasFlip "Random spiegelen"
 			checkbox chkAtlasRotate "Random 180 graden draaien"
 		)
@@ -218,6 +219,12 @@ plugin simpleMeshMod BrickGenMod
 					refresh()
 				)
 			)
+		)
+		on btnAtlasCheck pressed do
+		(
+			local js = BrickGenDetect.atlasJsonFor atlasFile brickL brickB brickH bedJoint headJoint
+			if js == undefined then messageBox "Kies eerst een textuur." title:"BrickGen"
+			else BrickGenAtlasEditor_open js this
 		)
 		on btnAtlasClear pressed do
 		(
@@ -280,7 +287,7 @@ plugin simpleMeshMod BrickGenMod
 			-- material-only parameters do not change the geometry
 			for n in (getPropNames this) where n != #mortarColor and n != #brickGloss do format "%=%|" n (getProperty this n) to:ss
 			for poly in raw do (for pt in poly do format "%," pt to:ss; format ";" to:ss)
-			if atlasFile != "" and doesFileExist atlasFile do format "%" (getFileModDate atlasFile) to:ss
+			if atlasFile != "" and doesFileExist atlasFile do format "%|%" (getFileModDate atlasFile) ::BrickGenAtlasRev to:ss
 			local sig = ss as string
 			if sig == cacheSig and cacheBuf != undefined then buf = cacheBuf
 			else

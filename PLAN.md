@@ -354,7 +354,7 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 
 - [x] Detectie in 3ds Max (`BrickGen_Detect.ms`), getest op de bestaande foto: 360 cellen in 3,2 s, werkt met Vlaams en halfsteens.
 - [x] "Kies textuur..." voor jpg/png + cache naast de foto (of in %TEMP%\BrickGen als die map niet schrijfbaar is).
-- [ ] Controlevenster met overlay en cellen aan/uit.
+- [ ] Controlevenster met overlay en cellen aan/uit (`BrickGen_AtlasEditor.ms`, gecodeerd, te testen).
 - [ ] Herkennen van normal/roughness-maps op naam.
 
 ### Fase 3b — Webtool (optioneel, later)

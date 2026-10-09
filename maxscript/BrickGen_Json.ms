@@ -164,3 +164,76 @@ fn BrickGenJson_get obj key default =
 (
 	if (classOf obj) == Dictionary and (hasDictValue obj key) then obj[key] else default
 )
+
+-- ------------------------------------------------------------------ writer
+-- Minimal JSON writer for what the reader returns (Dictionary, Array, String,
+-- numbers, booleans, undefined -> null). Key order is not preserved.
+global BrickGenJson_writeValue
+
+fn BrickGenJson_quote s =
+(
+	"\"" + (substituteString (substituteString s "\\" "\\\\") "\"" "\\\"") + "\""
+)
+
+fn BrickGenJson_writeValue v ss ind =
+(
+	local c = classOf v
+	if v == undefined then format "null" to:ss
+	else if c == Dictionary then
+	(
+		local ks = v.keys
+		sort ks
+		format "{\n" to:ss
+		for i = 1 to ks.count do
+		(
+			format "% %: " ind (BrickGenJson_quote (ks[i] as string)) to:ss
+			BrickGenJson_writeValue v[ks[i]] ss (ind + " ")
+			format "%\n" (if i < ks.count then "," else "") to:ss
+		)
+		format "%}" ind to:ss
+	)
+	else if c == Array then
+	(
+		-- arrays of objects one per line, other arrays on one line
+		format "[" to:ss
+		for i = 1 to v.count do
+		(
+			if classOf v[i] == Dictionary then
+			(
+				format "\n% " ind to:ss
+				-- objects inside arrays on a single line
+				local ks = v[i].keys
+				sort ks
+				format "{" to:ss
+				for j = 1 to ks.count do
+				(
+					format "%: " (BrickGenJson_quote (ks[j] as string)) to:ss
+					BrickGenJson_writeValue v[i][ks[j]] ss ""
+					if j < ks.count do format ", " to:ss
+				)
+				format "}" to:ss
+			)
+			else BrickGenJson_writeValue v[i] ss ind
+			if i < v.count do format "," to:ss
+		)
+		format "]" to:ss
+	)
+	else if c == String then format "%" (BrickGenJson_quote v) to:ss
+	else if c == BooleanClass then format "%" (if v then "true" else "false") to:ss
+	else format "%" v to:ss
+)
+
+-- Write a value as a JSON file. Returns true on success.
+fn BrickGenJson_writeFile path v =
+(
+	local ss = stringStream ""
+	BrickGenJson_writeValue v ss ""
+	local fh = createFile path
+	if fh == undefined then false
+	else
+	(
+		format "%\n" (ss as string) to:fh
+		close fh
+		true
+	)
+)
