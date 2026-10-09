@@ -361,8 +361,7 @@ plugin simpleMeshMod BrickGenMod
 			local ok = false
 			try
 			(
-				setMesh mesh numverts:0 numfaces:0
-				meshop.attach mesh cacheMesh
+				BrickGenMesh.copyMeshInto mesh cacheMesh
 				ok = mesh.numverts == cacheMesh.numverts and mesh.numfaces == cacheMesh.numfaces and \
 					(meshop.getNumMaps mesh) >= 3 and (meshop.getMapSupport mesh 1) and \
 					(distance (meshop.getMapVert mesh 1 1) (meshop.getMapVert cacheMesh 1 1)) < 0.0001 and \
@@ -373,8 +372,9 @@ plugin simpleMeshMod BrickGenMod
 			else if not BrickGenCacheWarned do
 			(
 				BrickGenCacheWarned = true
-				try ( format "BrickGen: snelle cache werkt niet, volledige opbouw (verts % / %, maps %, kanaal1 %, ID % / %)\n" \
-					mesh.numverts cacheMesh.numverts (meshop.getNumMaps mesh) (meshop.getMapSupport mesh 1) \
+				try ( format "BrickGen: snelle cache werkt niet, volledige opbouw (verts % / %, maps % / %, kanaal1 % / %, ID % / %)\n" \
+					mesh.numverts cacheMesh.numverts (meshop.getNumMaps mesh) (meshop.getNumMaps cacheMesh) \
+					(meshop.getMapSupport mesh 1) (meshop.getMapSupport cacheMesh 1) \
 					(try (getFaceMatID mesh 1) catch "?") (try (getFaceMatID cacheMesh 1) catch "?") )
 				catch ( format "BrickGen: snelle cache werkt niet, volledige opbouw\n" )
 			)
@@ -386,7 +386,7 @@ plugin simpleMeshMod BrickGenMod
 			if buf.faces.count > 0 do
 			(
 				-- a TriMesh copy via attach ("copy" did not give a mesh in 3ds Max 2026)
-				try ( cacheMesh = TriMesh(); meshop.attach cacheMesh mesh ) catch ( cacheMesh = undefined )
+				try ( cacheMesh = BrickGenMesh.copyMeshInto (TriMesh()) mesh ) catch ( cacheMesh = undefined )
 			)
 		)
 		local ms = timeStamp() - t0
