@@ -334,7 +334,7 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 - [ ] Bouwtijd gemeten en gelogd voor 7,5 m² en 200 m².
 
 ### Fase 2 — Atlas-texturering (1 week)
-> Status: gecodeerd, te testen in 3ds Max. `BrickGen_Atlas.ms` (JSON-atlas, cache, cel per steen via RNG-kanaal 3, centrale crop, spiegelen/draaien, kop/strek), `BrickGen_Material.ms` ("Maak materiaal", V-Ray of Physical). Eerste atlas: `presets/atlases/baksteen_rood_01.json` (Vlaams verband, Waalformaat, 340 cellen) automatisch gedetecteerd met `tools/detect_atlas.py` — referentie-algoritme voor de webtool. De textuur zelf staat in de (private) repo voor intern gebruik; niet meeleveren bij verkoop (§15).
+> Status: gecodeerd, te testen in 3ds Max. `BrickGen_Atlas.ms` (JSON-atlas, cache, cel per steen via RNG-kanaal 3, centrale crop, spiegelen/draaien, kop/strek), `BrickGen_Material.ms` ("Maak materiaal", V-Ray of Physical). Getest: werkt (voegkleur en glans instelbaar sinds de test). Eerste atlas: `presets/atlases/baksteen_rood_01.json` (Vlaams verband, Waalformaat, 340 cellen) automatisch gedetecteerd met `tools/detect_atlas.py` — referentie-algoritme voor de webtool. De textuur zelf staat in de (private) repo voor intern gebruik; niet meeleveren bij verkoop (§15).
 
 - [ ] Atlas-JSON inlezen (`BrickGen_Atlas.ms`). Eenvoudige JSON-parser in MAXScript of via `dotNet` (`System.Web.Script.Serialization` of Newtonsoft als beschikbaar).
 - [ ] UV-kanaal 1 volgens §9, inclusief spiegelen, draaien, afgezaagde stenen en kop/strek-keuze.
@@ -342,7 +342,20 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 - [ ] Knop "Maak materiaal" volgens §10.
 - [ ] Test: render van de testgevel toont geen zichtbare herhaling.
 
-### Fase 3 — Webtool (1 week, parallel met fase 2 mogelijk)
+### Fase 3 — Textuur kiezen zonder JSON (vervangt de webtool als eerste stap)
+> Beslissing (na fase 2-test): gebruikers kiezen gewoon een **jpg/png**; geen JSON, geen aparte webtool nodig voor het gewone geval.
+> - **Kies textuur...** in de modifier aanvaardt jpg/png/tif. BrickGen detecteert de stenen automatisch in 3ds Max (algoritme van `tools/detect_atlas.py`, in C# dat 3ds Max zelf compileert via `dotNet`, dus geen Python nodig; doel < 2 s voor een foto van 2000 px).
+> - Het resultaat wordt als cache naast de foto bewaard (`foto.brickgen.json`), onzichtbaar voor de gebruiker; volgende keer meteen geladen. Bestaande JSON-atlassen blijven werken.
+> - Een **controlevenster** in Max toont de foto met de gevonden stenen (kader per cel, kop/strek in een andere kleur); klik om een cel uit/aan te zetten, en sliders voor steenformaat/voegbreedte als de detectie ernaast zit.
+> - Het materiaal blijft gekoppeld aan de modifier ("Maak materiaal" + live voegkleur/glans): de UV's hangen af van de cellen, dus de foto hoort bij de geometrie. Een Material Editor-variant (eigen texmap "BrickGen textuur") is mogelijk maar bewust later: dan moet de modifier de foto uit het materiaal lezen en dat is foutgevoeliger (materiaal vervangen of in een Multi/Sub nesten breekt de koppeling).
+> - Normal/roughness: optioneel extra foto's met dezelfde afmetingen, automatisch herkend op naam (`_normal`, `_rough`).
+
+- [ ] Detectie in C# via `dotNet` (port van `tools/detect_atlas.py`), getest op de bestaande foto (zelfde 340 cellen).
+- [ ] "Kies textuur..." voor jpg/png + cache naast de foto.
+- [ ] Controlevenster met overlay en cellen aan/uit.
+- [ ] Herkennen van normal/roughness-maps op naam.
+
+### Fase 3b — Webtool (optioneel, later)
 - [ ] Alle functies 1–7 uit §11.
 - [ ] Export valideert tegen het JSON-formaat.
 - [ ] Gepubliceerd op GitHub Pages (kan ook vanuit een private repo bij een betaald GitHub-plan; anders de webtool in een aparte publieke repo zetten of lokaal openen).
