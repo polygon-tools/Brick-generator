@@ -85,7 +85,21 @@ struct BrickGenMaterialStruct
 		)
 		else
 		(
-			map = if classOf m == VRayMtl then m.texmap_diffuse else if classOf m == PhysicalMaterial then m.base_color_map else undefined
+			-- a softened copy of the photo: used directly, the photo's JPEG
+			-- blocks and pixels show up as blocky relief
+			local diff = if classOf m == VRayMtl then m.texmap_diffuse else if classOf m == PhysicalMaterial then m.base_color_map else undefined
+			local cur = if classOf m == VRayMtl then m.texmap_bump else if classOf m == PhysicalMaterial then m.bump_map else undefined
+			if classOf diff == Bitmaptexture then
+			(
+				map = if classOf cur == Bitmaptexture and cur != diff then cur else bitmapOn diff.fileName 1
+				if map != undefined do
+				(
+					if map.fileName != diff.fileName do map.fileName = diff.fileName
+					map.name = (getFilenameFile diff.fileName) + "_relief"
+					map.coords.blur = 2.0
+					try (map.filtering = 1) catch () -- summed area: smoother than pyramidal
+				)
+			)
 		)
 		map
 	),
@@ -220,6 +234,12 @@ struct BrickGenMaterialStruct
 			(
 				map.fileName = f
 				map.name = getFilenameFile f
+				local bump = if classOf b == VRayMtl then b.texmap_bump else if classOf b == PhysicalMaterial then b.bump_map else undefined
+				if classOf bump == Bitmaptexture and bump != map do
+				(
+					bump.fileName = f
+					bump.name = (getFilenameFile f) + "_relief"
+				)
 				true
 			)
 			else false
