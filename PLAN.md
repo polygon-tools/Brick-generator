@@ -334,7 +334,7 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 - [ ] Bouwtijd gemeten en gelogd voor 7,5 m² en 200 m².
 
 ### Fase 2 — Atlas-texturering (1 week)
-> Status: gecodeerd, te testen in 3ds Max. `BrickGen_Atlas.ms` (JSON-atlas, cache, cel per steen via RNG-kanaal 3, centrale crop, spiegelen/draaien, kop/strek), `BrickGen_Material.ms` ("Maak materiaal", V-Ray of Physical). Getest: werkt (voegkleur en glans instelbaar sinds de test). Eerste atlas: `presets/atlases/baksteen_rood_01.json` (Vlaams verband, Waalformaat, 340 cellen) automatisch gedetecteerd met `tools/detect_atlas.py` — referentie-algoritme voor de webtool. De textuur zelf staat in de (private) repo voor intern gebruik; niet meeleveren bij verkoop (§15).
+> Status: gecodeerd, te testen in 3ds Max. `BrickGen_Atlas.ms` (JSON-atlas, cache, cel per steen via RNG-kanaal 3, centrale crop, spiegelen/draaien, kop/strek), `BrickGen_Material.ms` ("Maak materiaal", V-Ray of Physical). Getest: werkt (voegkleur, glans en relief instelbaar sinds de test, live op het materiaal). Eerste atlas: `presets/atlases/baksteen_rood_01.json` (Vlaams verband, Waalformaat, 340 cellen) automatisch gedetecteerd met `tools/detect_atlas.py` — referentie-algoritme voor de webtool. De textuur zelf staat in de (private) repo voor intern gebruik; niet meeleveren bij verkoop (§15).
 
 - [ ] Atlas-JSON inlezen (`BrickGen_Atlas.ms`). Eenvoudige JSON-parser in MAXScript of via `dotNet` (`System.Web.Script.Serialization` of Newtonsoft als beschikbaar).
 - [ ] UV-kanaal 1 volgens §9, inclusief spiegelen, draaien, afgezaagde stenen en kop/strek-keuze.
@@ -350,8 +350,10 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 > - Het materiaal blijft gekoppeld aan de modifier ("Maak materiaal" + live voegkleur/glans): de UV's hangen af van de cellen, dus de foto hoort bij de geometrie. Een Material Editor-variant (eigen texmap "BrickGen textuur") is mogelijk maar bewust later: dan moet de modifier de foto uit het materiaal lezen en dat is foutgevoeliger (materiaal vervangen of in een Multi/Sub nesten breekt de koppeling).
 > - Normal/roughness: optioneel extra foto's met dezelfde afmetingen, automatisch herkend op naam (`_normal`, `_rough`).
 
-- [ ] Detectie in C# via `dotNet` (port van `tools/detect_atlas.py`), getest op de bestaande foto (zelfde 340 cellen).
-- [ ] "Kies textuur..." voor jpg/png + cache naast de foto.
+> Status: `BrickGen_Detect.ms` gecodeerd in pure MAXScript in plaats van C# (runtime-compilatie van C# is onzeker sinds 3ds Max op .NET 8 draait). Werkt op een verkleinde kopie (max 900 px): in een Python-simulatie van exact dit algoritme 327 van de 340 cellen op `baksteen_rood_01.jpg`. Extra t.o.v. de referentie: valse lintvoegen (donkere vlekken) worden weggefilterd. Displacement-optie geschrapt na test (bump volstaat).
+
+- [ ] Detectie in 3ds Max (`BrickGen_Detect.ms`), getest op de bestaande foto (~330 cellen, < 10 s).
+- [ ] "Kies textuur..." voor jpg/png + cache naast de foto (of in %TEMP%\BrickGen als die map niet schrijfbaar is).
 - [ ] Controlevenster met overlay en cellen aan/uit.
 - [ ] Herkennen van normal/roughness-maps op naam.
 

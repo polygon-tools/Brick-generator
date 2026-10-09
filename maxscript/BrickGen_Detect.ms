@@ -1,0 +1,289 @@
+-- BrickGen_Detect.ms
+-- Automatic atlas from a plain brick photo (jpg/png/tif), PLAN.md fase 3:
+-- finds the bricks in the photo and writes the atlas JSON as a cache next to
+-- the photo ("<foto>.brickgen.json"), so the user never needs a JSON file.
+-- Same method as tools/detect_atlas.py (reference), on a reduced copy of the
+-- photo (max 900 px) for speed; cell coordinates are scaled back to full size.
+
+struct BrickGenDetectStruct
+(
+	maxDim = 900,
+	memo = Dictionary #string, -- input signature -> JSON path (this session)
+
+	-- percentile with linear interpolation (like numpy); p in 0..100
+	fn pct arr p =
+	(
+		local a = sort (copy arr #nodeep)
+		local f = (p / 100.0) * (a.count - 1)
+		local i = (floor f) as integer
+		if i + 1 >= a.count then a[a.count] else a[i + 1] + (f - i) * (a[i + 2] - a[i + 1])
+	),
+
+	-- runs of true values, at least minLen long: #(#(start, end), ...) 0-based
+	fn runs mask minLen =
+	(
+		local out = #()
+		local s = 0
+		for i = 1 to mask.count do
+		(
+			if mask[i] and s == 0 do s = i
+			if not mask[i] and s > 0 do
+			(
+				if i - s >= minLen do append out #(s - 1, i - 2)
+				s = 0
+			)
+		)
+		if s > 0 and mask.count - s + 1 >= minLen do append out #(s - 1, mask.count - 1)
+		out
+	),
+
+	-- cands #(#(x, strength), ...) sorted by x: highest-scoring chain whose
+	-- spacings are (close to) one of the pitches. Returns the x values.
+	fn bestChain cands pitches tol =
+	(
+		local n = cands.count
+		if n == 0 do return #()
+		local score = for c in cands collect c[2]
+		local prev = for c in cands collect 0
+		for j = 1 to n do for i = 1 to j - 1 do
+		(
+			local d = cands[j][1] - cands[i][1]
+			local ok = false
+			for p in pitches where (abs (d - p)) <= tol do ok = true
+			if ok and score[i] + cands[j][2] > score[j] do
+			(
+				score[j] = score[i] + cands[j][2]
+				prev[j] = i
+			)
+		)
+		local j = 1
+		for k = 2 to n where score[k] > score[j] do j = k
+		local chain = #()
+		while j > 0 do
+		(
+			insertItem cands[j][1] chain 1
+			j = prev[j]
+		)
+		chain
+	),
+
+	fn runMin vals a b = ( local m = 1e9; for i = a to b do m = amin m vals[i + 1]; m ),
+
+	-- Detect the brick cells. Sizes in mm (the real brick and joints).
+	-- Returns #(imageWidth, imageHeight, cells) with cells
+	-- #(x, y, w, h, kind) in full-size pixels, or undefined.
+	fn detect imgPath L B H bedJoint headJoint =
+	(
+		local src = openBitMap imgPath
+		if src == undefined do return undefined
+		local W = src.width
+		local Hh = src.height
+		local fs = amin 1.0 (maxDim / ((amax W Hh) as float))
+		local sw = amax 1 ((W * fs) as integer)
+		local sh = amax 1 ((Hh * fs) as integer)
+		local sm = src
+		if fs < 1.0 do
+		(
+			sm = bitmap sw sh
+			copy src sm
+		)
+		local fx = sw as float / W
+		local fy = sh as float / Hh
+
+		-- grey values, g[row][col]
+		local g = for y = 0 to sh - 1 collect
+			for c in (getPixels sm [0, y] sw) collect (0.299 * c.r + 0.587 * c.g + 0.114 * c.b)
+		if sm != src do free sm
+		free src
+
+		local mn = amax 1 ((2.0 * fs + 0.5) as integer)
+
+		-- bed joints: dark rows
+		local rowp = for r in g collect pct r 80
+		local thr = pct rowp 18
+		local beds = runs (for v in rowp collect v < thr) mn
+		if beds.count < 3 do return undefined
+		local d = for i = 1 to beds.count - 1 collect 0.5 * (beds[i + 1][1] + beds[i + 1][2] - beds[i][1] - beds[i][2])
+		local m0 = pct d 50
+		-- drop spurious beds (dark specks inside a course): keep the darker one
+		local keep = #(beds[1])
+		for i = 2 to beds.count do
+		(
+			-- (no "b"/"k" names here: MAXScript is case-insensitive and B is a parameter)
+			local bed = beds[i]
+			local last = keep[keep.count]
+			if 0.5 * (bed[1] + bed[2] - last[1] - last[2]) < 0.6 * m0 then
+			(
+				if (runMin rowp bed[1] bed[2]) < (runMin rowp last[1] last[2]) do keep[keep.count] = bed
+			)
+			else append keep bed
+		)
+		beds = keep
+		if beds.count < 3 do return undefined
+		d = for i = 1 to beds.count - 1 collect 0.5 * (beds[i + 1][1] + beds[i + 1][2] - beds[i][1] - beds[i][2])
+		local coursePx = pct d 50
+		local s = coursePx / (H + bedJoint) -- px per mm
+		local pitches = #((L + headJoint) * s, (B + headJoint) * s)
+		local tol = 0.12 * pitches[2]
+		local jw = headJoint * s
+
+		local cells = #()
+		for bi = 1 to beds.count - 1 do
+		(
+			local y0 = beds[bi][2] + 1
+			local y1 = beds[bi + 1][1] - 1
+			if (y1 - y0) >= (amax 4.0 (8.0 * fs)) do
+			(
+				local r0 = y0 + mn
+				local r1 = y1 - mn
+				if r1 < r0 do ( r0 = y0; r1 = y1 )
+				local col = for x = 1 to sw collect pct (for r = r0 to r1 collect g[r + 1][x]) 85
+				local med = pct col 50
+				local t = pct col 15
+				local cands = #()
+				for q in (runs (for v in col collect v < t) mn) where (q[2] - q[1]) <= 2.5 * jw do
+					append cands #(0.5 * (q[1] + q[2]), med - (runMin col q[1] q[2]))
+				-- every joint costs a penalty, so a weak dark spot inside a
+				-- stretcher does not split it into two headers
+				if cands.count > 0 do
+				(
+					local st = sort (for c in cands collect c[2])
+					local strong = for i = (st.count / 2) + 1 to st.count collect st[i]
+					local pen = 0.6 * (pct strong 50)
+					for c in cands do c[2] -= pen
+				)
+				local ch = bestChain cands pitches tol
+				for i = 1 to ch.count - 1 do
+				(
+					local x0 = (ch[i] + 0.5 * jw + 0.5) as integer
+					local x1 = (ch[i + 1] - 0.5 * jw + 0.5) as integer
+					if (x1 - x0) >= 0.8 * (y1 - y0) do
+					(
+						local kind = if (x1 - x0 + 1) > 0.5 * (L + B) * s then "stretcher" else "header"
+						append cells #((x0 / fx + 0.5) as integer, (y0 / fy + 0.5) as integer, \
+							((x1 - x0 + 1) / fx + 0.5) as integer, ((y1 - y0 + 1) / fy + 0.5) as integer, kind)
+					)
+				)
+			)
+		)
+		#(W, Hh, cells)
+	),
+
+	fn jsonStr s = ( "\"" + (substituteString (substituteString s "\\" "\\\\") "\"" "\\\"") + "\"" ),
+
+	-- Sibling map next to the photo by name: foto_normal.png, foto_rough.jpg ...
+	fn findSibling imgPath suffixes =
+	(
+		local dir = getFilenamePath imgPath
+		local stem = getFilenameFile imgPath
+		local res = undefined
+		for sfx in suffixes do
+			for ext in #(".jpg", ".jpeg", ".png", ".tif", ".tiff", ".exr") do
+				if res == undefined and doesFileExist (dir + stem + sfx + ext) do res = dir + stem + sfx + ext
+		res
+	),
+
+	-- file name only when the map sits next to the JSON, else the full path
+	fn relPath f dirA dirB = ( if f == undefined then undefined else if (stricmp dirA dirB) == 0 then filenameFromPath f else f ),
+
+	-- Where the cache goes: next to the photo, or in the temp folder when that
+	-- folder is read-only.
+	fn cachePath imgPath =
+	(
+		local p = (getFilenamePath imgPath) + (getFilenameFile imgPath) + ".brickgen.json"
+		local ok = doesFileExist p
+		if not ok do
+		(
+			local f = try (createFile p) catch undefined
+			if f != undefined do ( close f; deleteFile p; ok = true )
+		)
+		if ok then p
+		else
+		(
+			local dir = (getDir #temp) + "\\BrickGen\\"
+			makeDir dir all:true
+			dir + (getFilenameFile imgPath) + "_" + ((getHashValue imgPath 0) as string) + ".brickgen.json"
+		)
+	),
+
+	-- signature of the detection input: photo date + brick sizes
+	fn inputSig imgPath L B H bedJoint headJoint =
+	(
+		(getFileModDate imgPath) + "|" + (L as string) + "|" + (B as string) + "|" + \
+			(H as string) + "|" + (bedJoint as string) + "|" + (headJoint as string)
+	),
+
+	-- The atlas JSON for a photo: from the cache when the photo and brick sizes
+	-- are unchanged, otherwise detected and written. Returns the JSON path or
+	-- undefined (message in the Listener).
+	fn atlasFor imgPath L B H bedJoint headJoint =
+	(
+		if not (doesFileExist imgPath) do return undefined
+		local out = cachePath imgPath
+		local sig = inputSig imgPath L B H bedJoint headJoint
+		if hasDictValue memo (sig + "|" + imgPath) and doesFileExist out do return out
+		if doesFileExist out do
+		(
+			local old = try (BrickGenJson_parseFile out) catch undefined
+			if old != undefined and (BrickGenJson_get old "source" "") == sig do
+			(
+				memo[sig + "|" + imgPath] = out
+				return out
+			)
+		)
+		local t0 = timeStamp()
+		local res = detect imgPath L B H bedJoint headJoint
+		if res == undefined or res[3].count == 0 do
+		(
+			format "BrickGen: geen stenen gevonden in %\n" imgPath
+			return undefined
+		)
+		local outDir = getFilenamePath out
+		local imgDir = getFilenamePath imgPath
+		local maps = #( \
+			#("diffuse", imgPath), \
+			#("normal", findSibling imgPath #("_normal", "_nrm", "_n")), \
+			#("roughness", findSibling imgPath #("_roughness", "_rough")), \
+			#("bump", findSibling imgPath #("_bump", "_height", "_disp")))
+		local ss = stringStream ""
+		format "{\n \"version\": 1,\n \"name\": %,\n \"source\": %,\n" (jsonStr (getFilenameFile imgPath)) (jsonStr sig) to:ss
+		format " \"image\": {\"width\": %, \"height\": %},\n \"maps\": {" res[1] res[2] to:ss
+		for i = 1 to maps.count do
+		(
+			local f = relPath maps[i][2] outDir imgDir
+			format "%\"%\": %" (if i > 1 then ", " else "") maps[i][1] (if f == undefined then "null" else jsonStr f) to:ss
+		)
+		format "},\n \"realBrick\": {\"L\": %, \"H\": %},\n \"cells\": [\n" L H to:ss
+		local cells = res[3]
+		local ns = 0
+		for i = 1 to cells.count do
+		(
+			local c = cells[i]
+			if c[5] == "stretcher" do ns += 1
+			format "  {\"id\": %, \"x\": %, \"y\": %, \"w\": %, \"h\": %, \"kind\": \"%\", \"disabled\": false}%\n" \
+				(i - 1) c[1] c[2] c[3] c[4] c[5] (if i < cells.count then "," else "") to:ss
+		)
+		format " ]\n}\n" to:ss
+		local fh = createFile out
+		if fh == undefined do ( format "BrickGen: kan % niet schrijven\n" out; return undefined )
+		format "%" (ss as string) to:fh
+		close fh
+		memo[sig + "|" + imgPath] = out
+		format "BrickGen: % stenen gevonden in % (% strek, % kop), % ms -> %\n" \
+			cells.count (filenameFromPath imgPath) ns (cells.count - ns) (timeStamp() - t0) out
+		out
+	),
+
+	fn isImage f = ( f != undefined and (findItem #(".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".tga") (toLower (getFilenameType f))) > 0 ),
+
+	-- The atlas JSON for what the user picked: a JSON as is, a photo via
+	-- detection (cached). Sizes in mm. undefined when nothing usable.
+	fn atlasJsonFor f L B H bedJoint headJoint =
+	(
+		if f == undefined or f == "" then undefined
+		else if isImage f then atlasFor f L B H bedJoint headJoint
+		else f
+	)
+)
+
+global BrickGenDetect = BrickGenDetectStruct()

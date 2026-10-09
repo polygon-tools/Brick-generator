@@ -19,6 +19,7 @@
 		"BrickGen_UV.ms",
 		"BrickGen_Region.ms",
 		"BrickGen_Atlas.ms",
+		"BrickGen_Detect.ms",
 		"BrickGen_Material.ms",
 		"BrickGen_Mesh.ms",
 		"BrickGen_Object.ms",

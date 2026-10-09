@@ -153,11 +153,11 @@ plugin simpleMeshMod BrickGenMod
 	(
 		spinner spnMatIdCount "Steen-ID's (1..N):" type:#integer range:[1, 99, 5]
 		spinner spnMortarMatId "Voeg-ID:" type:#integer range:[1, 9999, 100]
-		group "Textuur-atlas"
+		group "Textuur (foto of atlas)"
 		(
 			edittext edtAtlas "" readOnly:true width:140
 			edittext edtAtlasPath "" readOnly:true visible:false
-			button btnAtlas "Kies atlas..." width:90 across:2
+			button btnAtlas "Kies textuur..." width:90 across:2
 			button btnAtlasClear "Geen" width:50
 			checkbox chkAtlasFlip "Random spiegelen"
 			checkbox chkAtlasRotate "Random 180 graden draaien"
@@ -168,7 +168,6 @@ plugin simpleMeshMod BrickGenMod
 			spinner spnGloss "Glans steen (%):" type:#float range:[0, 100, 30]
 			spinner spnReliefBrick "Relief steen (%):" type:#float range:[0, 200, 30]
 			spinner spnReliefMortar "Relief voeg (%):" type:#float range:[0, 200, 60]
-			checkbox chkDisp "Displacement bij render"
 		)
 		button btnMakeMat "Maak materiaal" width:140 height:26
 
@@ -179,7 +178,7 @@ plugin simpleMeshMod BrickGenMod
 		(
 			local node = bgNode()
 			if node != undefined do BrickGenMaterial.update node.material cpMortar.color spnGloss.value \
-				spnReliefBrick.value spnReliefMortar.value chkDisp.checked
+				spnReliefBrick.value spnReliefMortar.value false
 		)
 		fn readMaterial =
 		(
@@ -191,27 +190,27 @@ plugin simpleMeshMod BrickGenMod
 				spnGloss.value = st[2]
 				spnReliefBrick.value = st[3]
 				spnReliefMortar.value = st[4]
-				chkDisp.checked = st[5]
 			)
 		)
 		on cpMortar changed c do updateMaterial()
 		on spnGloss changed v do updateMaterial()
 		on spnReliefBrick changed v do updateMaterial()
 		on spnReliefMortar changed v do updateMaterial()
-		on chkDisp changed v do updateMaterial()
 
-		fn refresh = ( edtAtlas.text = if atlasFile == "" then "(geen atlas)" else filenameFromPath atlasFile )
+		fn refresh = ( edtAtlas.text = if atlasFile == "" then "(geen textuur)" else filenameFromPath atlasFile )
 		on rMat open do ( refresh(); readMaterial() )
 		on btnAtlas pressed do
 		(
 			local startDir = if atlasFile != "" then getFilenamePath atlasFile
 				else pathConfig.appendPath ::BrickGenRoot "presets\\atlases\\"
-			local f = getOpenFileName caption:"BrickGen atlas kiezen" filename:startDir \
-				types:"BrickGen atlas (*.json)|*.json|Alle bestanden (*.*)|*.*"
+			local f = getOpenFileName caption:"BrickGen: baksteenfoto kiezen" filename:startDir \
+				types:"Baksteenfoto (*.jpg;*.png;*.tif)|*.jpg;*.jpeg;*.png;*.tif;*.tiff|BrickGen atlas (*.json)|*.json|Alle bestanden (*.*)|*.*"
 			if f != undefined do
 			(
-				if (BrickGenAtlasLib.get f) == undefined then
-					messageBox ("Dit is geen bruikbare BrickGen-atlas:\n" + f) title:"BrickGen"
+				local js = BrickGenDetect.atlasJsonFor f brickL brickB brickH bedJoint headJoint
+				if js == undefined or (BrickGenAtlasLib.get js) == undefined then
+					messageBox ("BrickGen vond geen bruikbare stenen in:\n" + f + \
+						"\n\nGebruik een recht, vlak gefotografeerde gevel (geen perspectief) met hetzelfde steenformaat als ingesteld bij Steen.") title:"BrickGen"
 				else
 				(
 					atlasFile = f
@@ -229,7 +228,7 @@ plugin simpleMeshMod BrickGenMod
 		on btnMakeMat pressed do
 		(
 			local node = refs.dependentNodes this firstOnly:true
-			local atlas = BrickGenAtlasLib.get atlasFile
+			local atlas = BrickGenAtlasLib.get (BrickGenDetect.atlasJsonFor atlasFile brickL brickB brickH bedJoint headJoint)
 			if atlas == undefined and atlasFile != "" do
 				messageBox "De atlas kon niet gelezen worden; het materiaal krijgt een effen kleur." title:"BrickGen"
 			if atlas != undefined and (BrickGenAtlasLib.mapPath atlas "diffuse") != undefined and \
@@ -237,7 +236,7 @@ plugin simpleMeshMod BrickGenMod
 				messageBox ("Textuur niet gevonden:\n" + (BrickGenAtlasLib.mapPath atlas "diffuse") + \
 					"\n\nZet de afbeelding naast het atlas-bestand.") title:"BrickGen"
 			BrickGenMaterial.makeFor node atlas matIdCount mortarMatId mortarCol:cpMortar.color gloss:spnGloss.value \
-				reliefBrick:spnReliefBrick.value reliefMortar:spnReliefMortar.value disp:chkDisp.checked
+				reliefBrick:spnReliefBrick.value reliefMortar:spnReliefMortar.value disp:false
 		)
 	)
 
@@ -327,7 +326,7 @@ plugin simpleMeshMod BrickGenMod
 				p.matIdCount = matIdCount
 				p.mortarMatId = mortarMatId
 				p.previewMode = previewMode
-			p.atlas = BrickGenAtlasLib.get atlasFile
+			p.atlas = BrickGenAtlasLib.get (BrickGenDetect.atlasJsonFor atlasFile brickL brickB brickH bedJoint headJoint)
 			lastAtlasInfo = if p.atlas == undefined then "geen atlas" else \
 				(p.atlas.name + ", " + ((p.atlas.stretchers.count + p.atlas.headers.count) as string) + " cellen")
 			p.atlasFlip = atlasFlip
