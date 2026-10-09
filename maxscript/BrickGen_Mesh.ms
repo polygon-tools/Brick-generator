@@ -464,19 +464,6 @@ struct BrickGenMeshStruct
 
 	fn buildWall p = ( buildWallInto (BrickGenMeshBuffer()) p ),
 
-	-- Copy TriMesh src into dst (emptied first) in one native call. meshop.attach
-	-- drops map channels the target does not support yet, so channels 1 and 2
-	-- are enabled on the empty target first.
-	fn copyMeshInto dst src =
-	(
-		setMesh dst numverts:0 numfaces:0
-		meshop.setNumMaps dst 3 keep:false
-		meshop.setMapSupport dst 1 true
-		meshop.setMapSupport dst 2 true
-		meshop.attach dst src
-		dst
-	),
-
 	-- Write the buffer into a TriMesh (the `mesh` of a simpleObject).
 	-- Returns timings in ms: #(setMesh, smoothing+edges, uv).
 	fn applyToMesh m buf =
