@@ -144,6 +144,8 @@ plugin simpleMeshMod BrickGenMod
 		atlasFile type:#string ui:edtAtlasPath default:""
 		atlasFlip type:#boolean ui:chkAtlasFlip default:true
 		atlasRotate type:#boolean ui:chkAtlasRotate default:true
+		mortarColor type:#color ui:cpMortar default:(color 120 115 108)
+		brickGloss type:#float ui:spnGloss default:30.0
 	)
 	rollout rMat "Materiaal en textuur"
 	(
@@ -158,7 +160,21 @@ plugin simpleMeshMod BrickGenMod
 			checkbox chkAtlasFlip "Random spiegelen"
 			checkbox chkAtlasRotate "Random 180 graden draaien"
 		)
+		group "Materiaal"
+		(
+			colorpicker cpMortar "Voegkleur:" color:(color 120 115 108) modal:false
+			spinner spnGloss "Glans steen (%):" type:#float range:[0, 100, 30]
+		)
 		button btnMakeMat "Maak materiaal" width:140 height:26
+
+		-- colour and gloss also update a material that was already made
+		fn updateMaterial col gloss =
+		(
+			local node = refs.dependentNodes this firstOnly:true
+			if node != undefined do BrickGenMaterial.updateColors node.material col gloss
+		)
+		on cpMortar changed c do updateMaterial c brickGloss
+		on spnGloss changed v do updateMaterial mortarColor v
 
 		fn refresh = ( edtAtlas.text = if atlasFile == "" then "(geen atlas)" else filenameFromPath atlasFile )
 		on rMat open do refresh()
@@ -196,7 +212,7 @@ plugin simpleMeshMod BrickGenMod
 				not (doesFileExist (BrickGenAtlasLib.mapPath atlas "diffuse")) do
 				messageBox ("Textuur niet gevonden:\n" + (BrickGenAtlasLib.mapPath atlas "diffuse") + \
 					"\n\nZet de afbeelding naast het atlas-bestand.") title:"BrickGen"
-			BrickGenMaterial.makeFor node atlas matIdCount mortarMatId
+			BrickGenMaterial.makeFor node atlas matIdCount mortarMatId mortarCol:mortarColor gloss:brickGloss
 		)
 	)
 

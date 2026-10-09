@@ -27,7 +27,10 @@ struct BrickGenMaterialStruct
 		)
 	),
 
-	fn brickMaterial atlas vray =
+	-- gloss 0..100 (%): strength of the brick's reflection
+	fn reflColor gloss = ( local g = 255.0 * (amax 0.0 (amin 100.0 gloss)) / 100.0; color g g g ),
+
+	fn brickMaterial atlas vray gloss:30.0 =
 	(
 		local diff = if atlas != undefined then bitmapOn (BrickGenAtlasLib.mapPath atlas "diffuse") 1 else undefined
 		local nrm = if atlas != undefined then bitmapOn (BrickGenAtlasLib.mapPath atlas "normal") 1 else undefined
@@ -38,7 +41,7 @@ struct BrickGenMaterialStruct
 			m = VRayMtl name:"BrickGen_Steen"
 			m.diffuse = color 150 75 55
 			if diff != undefined do m.texmap_diffuse = diff
-			m.reflection = color 255 255 255
+			m.reflection = reflColor gloss
 			m.reflection_glossiness = 0.45
 			if rough != undefined do
 			(
@@ -57,6 +60,7 @@ struct BrickGenMaterialStruct
 			m.base_color = color 150 75 55
 			if diff != undefined do m.base_color_map = diff
 			m.roughness = 0.8
+			m.reflectivity = gloss / 100.0
 			if rough != undefined do m.roughness_map = rough
 			if nrm != undefined do m.bump_map = Normal_Bump normal_map:nrm
 		)
@@ -64,20 +68,43 @@ struct BrickGenMaterialStruct
 		m
 	),
 
-	fn mortarMaterial vray =
+	fn mortarMaterial vray c:(color 120 115 108) =
 	(
-		local c = color 140 135 128
 		local m = if vray then (VRayMtl name:"BrickGen_Voeg" diffuse:c reflection:(color 40 40 40) reflection_glossiness:0.3)
 			else (PhysicalMaterial name:"BrickGen_Voeg" base_color:c roughness:0.95)
 		m
 	),
 
+	-- Live update of a material made by makeFor: mortar colour and brick gloss.
+	-- Only touches sub-materials named BrickGen_Voeg / BrickGen_Steen.
+	fn updateColors mm mortarCol gloss =
+	(
+		if classOf mm == Multimaterial do
+		(
+			local done = #()
+			for sub in mm.materialList where sub != undefined and (findItem done sub) == 0 do
+			(
+				append done sub
+				if sub.name == "BrickGen_Voeg" do
+				(
+					if isProperty sub #diffuse then sub.diffuse = mortarCol
+					else if isProperty sub #base_color do sub.base_color = mortarCol
+				)
+				if sub.name == "BrickGen_Steen" do
+				(
+					if isProperty sub #reflection then sub.reflection = reflColor gloss
+					else if isProperty sub #reflectivity do sub.reflectivity = gloss / 100.0
+				)
+			)
+		)
+	),
+
 	-- Builds the material and assigns it to node. Returns the material.
-	fn makeFor node atlas matIdCount mortarMatId =
+	fn makeFor node atlas matIdCount mortarMatId mortarCol:(color 120 115 108) gloss:30.0 =
 	(
 		local vray = hasVRay()
-		local brick = brickMaterial atlas vray
-		local mortar = mortarMaterial vray
+		local brick = brickMaterial atlas vray gloss:gloss
+		local mortar = mortarMaterial vray c:mortarCol
 		local n = amax 1 matIdCount
 		local mname = "BrickGen_" + (if atlas != undefined then atlas.name else "Gevel")
 		local mm = Multimaterial name:mname numsubs:(n + 1)
