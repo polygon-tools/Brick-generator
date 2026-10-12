@@ -40,3 +40,19 @@ macroScript BrickGen_CreateWall
 (
 	startObjectCreation BrickWall
 )
+
+-- Toolbar button / hotkey: show bricks in the viewports on/off for every
+-- BrickGen modifier in the scene (rendering always shows the bricks).
+macroScript BrickGen_ToggleViewBricks
+	category:"BrickGen"
+	buttonText:"Stenen aan/uit"
+	tooltip:"BrickGen: stenen in de viewports aan/uit (render toont altijd stenen)"
+(
+	local mods = getClassInstances BrickGenMod
+	if mods.count > 0 do
+	(
+		local newVal = not mods[1].viewSimple
+		for m in mods do m.viewSimple = newVal
+		format "BrickGen: stenen in viewports %\n" (if newVal then "uit" else "aan")
+	)
+)

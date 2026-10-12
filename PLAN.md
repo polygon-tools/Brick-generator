@@ -328,6 +328,8 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 >
 > Ook nieuw (te testen): **Offset Y** (parameter `offsetY`, achteraan in pBond) naast Offset X (= bestaande `startOffset`): verschuift de lagen; de modifier verschuift de polygonen modulo één laag en compenseert in p.tm. Bij 90° gedraaid wisselen X en Y van rol.
 >
+> Ook nieuw (te testen): `depthForward` (pWall, achteraan; true bij nieuwe modifiers via on create): p.tm verschuift over de dagkantdiepte naar voren, zoals Extrude. `viewSimple` (pView, achteraan): viewport toont enkel voegvlakken (C#/MAXScript `skipBricks`), #preRender/#postRender-callbacks bouwen de stenen voor de render; macro `BrickGen_ToggleViewBricks`. Per viewport verschillend tonen kan 3ds Max niet voor één object.
+>
 > **Openstaand daarna:** kromme stenen (extra vertices, optioneel), betere herkenning voor lange stenen van wisselende lengte, schuine randen (puntgevels), rollagen.
 
 ## 12. Fasering met acceptatiecriteria

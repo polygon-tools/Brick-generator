@@ -31,7 +31,8 @@ struct BrickGenWallParams
 	-- texture atlas (BrickGen_Atlas.ms); undefined = plain 0..1 UV per brick
 	atlas = undefined, atlasFlip = true, atlasRotate = true,
 	bondOverride = undefined, -- a BrickGenBond used instead of bondType (reveal strips)
-	chipChance = 0.0, chipSize = 6.0 -- broken corners: fraction of bricks, size in mm
+	chipChance = 0.0, chipSize = 6.0, -- broken corners: fraction of bricks, size in mm
+	skipBricks = false -- viewport "flat only": mortar planes, no bricks
 )
 
 struct BrickGenMeshBuffer
@@ -98,6 +99,7 @@ struct BrickGenMeshStruct
 	--   11..18: corner jitter x, z, y for front vertex 1..8
 	fn addBrick buf p idx x0 x1 z0 z1 nomX0 nomL nomZ0 clipL clipR clipT clipB:false unit:#S =
 	(
+		if p.skipBricks do return ok
 		local R = BrickGenRNG
 		local key = R.brickKey (p.seed + p.segIndex * 7919) idx
 		local jitter = not p.previewMode
