@@ -330,6 +330,8 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 >
 > Ook nieuw (te testen): `depthForward` (pWall, achteraan; true bij nieuwe modifiers via on create): p.tm verschuift over de dagkantdiepte naar voren, zoals Extrude. `viewSimple` (pView, achteraan): viewport toont enkel voegvlakken (C#/MAXScript `skipBricks`), #preRender/#postRender-callbacks bouwen de stenen voor de render; macro `BrickGen_ToggleViewBricks`. Per viewport verschillend tonen kan 3ds Max niet voor één object.
 >
+> Ook nieuw (te testen): instanced modifier (copy / paste instanced) op meerdere splines: `BrickGen_evalNode` kiest de spline waarvan de knopen-bbox past bij de inkomende mesh (3ds Max zegt een scripted modifier niet welke node hij evalueert); cache houdt tot 6 resultaten bij; Maak materiaal en de materiaalinstellingen gelden voor alle nodes van de modifier.
+>
 > **Openstaand daarna:** kromme stenen (extra vertices, optioneel), betere herkenning voor lange stenen van wisselende lengte, schuine randen (puntgevels), rollagen.
 
 ## 12. Fasering met acceptatiecriteria

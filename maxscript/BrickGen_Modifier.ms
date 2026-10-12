@@ -13,6 +13,49 @@
 -- Requires BrickGen_Region.ms and BrickGen_Mesh.ms (BrickGen_Startup.ms).
 -- Never change classID; never remove or reorder parameters.
 
+-- The node this evaluation is for. An instanced modifier (copy / paste
+-- instanced) is shared by several splines; 3ds Max does not tell a scripted
+-- modifier which one it is evaluating, so the incoming mesh (the closed
+-- shape, converted by 3ds Max) is compared with each candidate spline: the
+-- one whose knot bounding box (local) matches best.
+fn BrickGen_evalNode modi inMesh =
+(
+	local nodes = refs.dependentNodes modi
+	if nodes.count <= 1 then (if nodes.count == 1 then nodes[1] else undefined)
+	else
+	(
+		local best = nodes[1]
+		local nv = if inMesh != undefined then inMesh.numverts else 0
+		if nv > 0 do
+		(
+			local mn = [1e30, 1e30, 1e30]
+			local mx = [-1e30, -1e30, -1e30]
+			for i = 1 to nv do
+			(
+				local v = getVert inMesh i
+				mn = [amin mn.x v.x, amin mn.y v.y, amin mn.z v.z]
+				mx = [amax mx.x v.x, amax mx.y v.y, amax mx.z v.z]
+			)
+			local bestD = 1e30
+			for n in nodes where (isKindOf n.baseObject SplineShape or isKindOf n.baseObject line) do
+			(
+				local kmn = [1e30, 1e30, 1e30]
+				local kmx = [-1e30, -1e30, -1e30]
+				for sp = 1 to (numSplines n) do
+					for k = 1 to (numKnots n sp) do
+					(
+						local v = in coordsys local getKnotPoint n sp k
+						kmn = [amin kmn.x v.x, amin kmn.y v.y, amin kmn.z v.z]
+						kmx = [amax kmx.x v.x, amax kmx.y v.y, amax kmx.z v.z]
+					)
+				local d = (distance kmn mn) + (distance kmx mx)
+				if d < bestD do ( bestD = d; best = n )
+			)
+		)
+		best
+	)
+)
+
 -- All splines of the editable spline at the bottom of the node's stack, as
 -- closed polygons in the node's local coordinates (system units).
 fn BrickGen_splinePolygons node =
@@ -112,6 +155,13 @@ plugin simpleMeshMod BrickGenMod
 	local uiReliefMortar = 60.0
 
 	fn bgNode = ( refs.dependentNodes this firstOnly:true )
+	-- every node using this modifier (instances), each material once
+	fn bgMaterials =
+	(
+		local res = #()
+		for n in (refs.dependentNodes this) where n.material != undefined do appendIfUnique res n.material
+		res
+	)
 	fn bgReadMaterial =
 	(
 		local node = bgNode()
@@ -126,8 +176,7 @@ plugin simpleMeshMod BrickGenMod
 	)
 	fn bgUpdateMaterial =
 	(
-		local node = bgNode()
-		if node != undefined do BrickGenMaterial.update node.material uiMortarCol uiGloss \
+		for mtl in bgMaterials() do BrickGenMaterial.update mtl uiMortarCol uiGloss \
 			uiReliefBrick uiReliefMortar false
 	)
 
@@ -238,9 +287,9 @@ plugin simpleMeshMod BrickGenMod
 					try (notifyDependents this) catch ()
 					refresh()
 					-- an existing BrickGen material gets the new photo too
-					local node = bgNode()
-					if node != undefined and (BrickGenMaterial.setTexture node.material (BrickGenAtlasLib.get js)) do
-						format "BrickGen: materiaal gebruikt nu %\n" (filenameFromPath f)
+					for mtl in bgMaterials() do
+						if (BrickGenMaterial.setTexture mtl (BrickGenAtlasLib.get js)) do
+							format "BrickGen: materiaal % gebruikt nu %\n" mtl.name (filenameFromPath f)
 				)
 			)
 		)
@@ -266,8 +315,10 @@ plugin simpleMeshMod BrickGenMod
 				not (doesFileExist (BrickGenAtlasLib.mapPath atlas "diffuse")) do
 				messageBox ("Textuur niet gevonden:\n" + (BrickGenAtlasLib.mapPath atlas "diffuse") + \
 					"\n\nZet de afbeelding naast het atlas-bestand.") title:"BrickGen"
-			BrickGenMaterial.makeFor node atlas matIdCount mortarMatId mortarCol:uiMortarCol gloss:uiGloss \
+			local mm = BrickGenMaterial.makeFor node atlas matIdCount mortarMatId mortarCol:uiMortarCol gloss:uiGloss \
 				reliefBrick:uiReliefBrick reliefMortar:uiReliefMortar disp:false
+			-- instances: every facade using this modifier gets the material
+			for n in (refs.dependentNodes this) do n.material = mm
 		)
 	)
 
@@ -321,8 +372,9 @@ plugin simpleMeshMod BrickGenMod
 	)
 
 	-- Cache: the geometry is only rebuilt when a parameter or the spline changes.
-	local cacheSig = ""
-	local cacheBuf = undefined
+	-- a few results (instanced modifiers: one per spline), newest last
+	local cacheSigs = #()
+	local cacheBufs = #()
 	local lastAtlasInfo = "geen atlas"
 
 
@@ -332,7 +384,7 @@ plugin simpleMeshMod BrickGenMod
 		-- (mesh is undefined when 3ds Max evaluates during a rollout open)
 		local t0 = timeStamp()
 		local buf = BrickGenMeshBuffer()
-		local node = refs.dependentNodes this firstOnly:true
+		local node = BrickGen_evalNode this mesh
 		local base = if node != undefined then node.baseObject else undefined
 		if base != undefined and (isKindOf base SplineShape or isKindOf base line) then
 		(
@@ -348,7 +400,8 @@ plugin simpleMeshMod BrickGenMod
 			if atlasFile != "" and doesFileExist atlasFile do format "%|%" (getFileModDate atlasFile) ::BrickGenAtlasRev to:ss
 			format "|R%" (viewSimple and not BrickGenRendering) to:ss
 			local sig = ss as string
-			if sig == cacheSig and cacheBuf != undefined then buf = cacheBuf
+			local hit = findItem cacheSigs sig
+			if hit > 0 then buf = cacheBufs[hit]
 			else
 			(
 				-- bounding box in mm
@@ -457,8 +510,9 @@ plugin simpleMeshMod BrickGenMod
 							jambOffsetMm:(revealOffset / s)
 					)
 				)
-				cacheSig = sig
-				cacheBuf = buf
+				append cacheSigs sig
+				append cacheBufs buf
+				if cacheSigs.count > 6 do ( deleteItem cacheSigs 1; deleteItem cacheBufs 1 )
 			)
 		)
 		else if not BrickGenModWarned do
