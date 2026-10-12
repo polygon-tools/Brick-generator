@@ -23,6 +23,17 @@ fn BrickGen_splinePolygons node =
 
 global BrickGenModWarned = false
 
+-- Viewport "flat only": while rendering, every BrickGen builds its full bricks.
+global BrickGenRendering = false
+fn BrickGen_setRendering v =
+(
+	BrickGenRendering = v
+	for m in (getClassInstances BrickGenMod) where m.viewSimple do try (notifyDependents m) catch ()
+)
+callbacks.removeScripts id:#BrickGenRender
+callbacks.addScript #preRender "BrickGen_setRendering true" id:#BrickGenRender
+callbacks.addScript #postRender "BrickGen_setRendering false" id:#BrickGenRender
+
 plugin simpleMeshMod BrickGenMod
 	name:"BrickGen"
 	classID:#(0x5c2e8a13, 0x1f7b3d96)
@@ -39,6 +50,7 @@ plugin simpleMeshMod BrickGenMod
 		revealDepth type:#worldUnits ui:spnReveal default:30.0
 		revealOuter type:#boolean ui:chkRevealOuter default:false
 		revealOffset type:#worldUnits ui:spnRevealOffset default:0.0
+		depthForward type:#boolean ui:chkDepthForward default:false -- true for new modifiers (on create)
 	)
 	parameters pBrick rollout:rBrick
 	(
@@ -87,6 +99,7 @@ plugin simpleMeshMod BrickGenMod
 	parameters pView rollout:rView
 	(
 		previewMode type:#boolean ui:chkPreview default:false
+		viewSimple type:#boolean ui:chkViewSimple default:false
 	)
 
 	-- ===================================================== material settings
@@ -130,6 +143,7 @@ plugin simpleMeshMod BrickGenMod
 			spinner spnReveal "Diepte:" type:#worldUnits range:[0, 1e6, 30]
 			spinner spnRevealOffset "Offset zijkant:" type:#worldUnits range:[-1e6, 1e6, 0]
 			checkbox chkRevealOuter "Ook langs de buitenrand"
+			checkbox chkDepthForward "Dikte naar voren (zoals Extrude)"
 		)
 	)
 
@@ -297,11 +311,13 @@ plugin simpleMeshMod BrickGenMod
 	rollout rView "Weergave"
 	(
 		checkbox chkPreview "Snelle preview (geen afronding/variatie)"
+		checkbox chkViewSimple "Viewport: enkel vlak (render: stenen)"
 	)
 
 	on create do
 	(
 		try (revealDepth = units.decodeValue "300mm") catch ()
+		depthForward = true
 	)
 
 	-- Cache: the geometry is only rebuilt when a parameter or the spline changes.
@@ -330,6 +346,7 @@ plugin simpleMeshMod BrickGenMod
 			for n in (getPropNames this) where n != #mortarColor and n != #brickGloss do format "%=%|" n (getProperty this n) to:ss
 			for poly in raw do (for pt in poly do format "%," pt to:ss; format ";" to:ss)
 			if atlasFile != "" and doesFileExist atlasFile do format "%|%" (getFileModDate atlasFile) ::BrickGenAtlasRev to:ss
+			format "|R%" (viewSimple and not BrickGenRendering) to:ss
 			local sig = ss as string
 			if sig == cacheSig and cacheBuf != undefined then buf = cacheBuf
 			else
@@ -415,6 +432,14 @@ plugin simpleMeshMod BrickGenMod
 						p.tm = (transMatrix [0, 0, -dy]) * p.tm
 					)
 				)
+				-- viewport "flat only": no bricks, only the (mortar) planes
+				p.skipBricks = viewSimple and not BrickGenRendering
+				if p.skipBricks do p.mortarEnabled = true -- the plane is what you see
+				-- thickness towards the front, like Extrude: the facade moves forward
+				-- by the reveal depth, so the reveals run from the spline plane
+				-- forwards (wall-local -Y = front)
+				if depthForward and revealDepth > 0.0 do
+					p.tm = (transMatrix [0, -(revealDepth / s), 0]) * p.tm
 				if polys.count > 0 do
 				(
 					-- C# builder when available (bin\BrickGen.Core.dll), else MAXScript

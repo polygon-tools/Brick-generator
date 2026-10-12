@@ -82,6 +82,7 @@ struct BrickGenNativeStruct
 			np.AtlasRotate = p.atlasRotate
 			np.ChipChance = p.chipChance
 			np.ChipSize = p.chipSize
+			np.SkipBricks = p.skipBricks
 			np.RevealDepth = revealDepthMm
 			np.RevealOuter = revealOuter
 			np.RevealOffset = revealOffsetMm

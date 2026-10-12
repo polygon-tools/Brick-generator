@@ -29,6 +29,7 @@ namespace BrickGen
         public bool PreviewMode = false;
         public bool AtlasFlip = true, AtlasRotate = true;
         public double ChipChance = 0, ChipSize = 6;
+        public bool SkipBricks = false; // viewport "flat only": mortar planes, no bricks
         public double RevealDepth = 0, RevealOffset = 0;
         public bool RevealOuter = false;
 
@@ -497,6 +498,7 @@ namespace BrickGen
         static void AddBrick(Buf buf, Params p, Atlas atlas, long idx, double x0, double x1, double z0, double z1,
             double nomX0, double nomL, double nomZ0, bool clipL, bool clipR, bool clipT, bool clipB, Unit unit)
         {
+            if (p.SkipBricks) return;
             long key = Rng.BrickKey(p.Seed + (long)p.SegIndex * 7919, idx);
             bool jitter = !p.PreviewMode;
             double r1x = 0, r1y = 0, r1z = 0;
