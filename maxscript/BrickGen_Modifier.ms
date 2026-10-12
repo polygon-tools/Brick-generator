@@ -13,17 +13,44 @@
 -- Requires BrickGen_Region.ms and BrickGen_Mesh.ms (BrickGen_Startup.ms).
 -- Never change classID; never remove or reorder parameters.
 
--- Viewport "flat only": keep the incoming mesh, i.e. the closed spline as
--- 3ds Max caps it (one face with the openings as holes, no inner lines),
--- moved forward like the bricks when "Dikte naar voren" is on.
+-- Viewport "flat only": a simple slab like Extrude. The incoming mesh is the
+-- closed spline as 3ds Max caps it (one face with the openings as holes);
+-- it becomes the front and back, its open edges (outline and openings) get
+-- side faces over the reveal depth. Only real edges stay visible.
 fn BrickGen_flatMesh modi m =
 (
-	if modi.depthForward and modi.revealDepth > 0.0 do
+	local T = modi.revealDepth
+	local dir = if modi.flipSide then -1.0 else 1.0
+	local front = if modi.depthForward then dir * T else 0.0
+	local back = front - dir * T
+	local nv = m.numverts
+	local nf = m.numfaces
+	local verts = for i = 1 to nv collect (getVert m i)
+	local faces = for f = 1 to nf collect (getFace m f)
+	if T > 0.0 do
 	(
-		local dz = if modi.flipSide then -modi.revealDepth else modi.revealDepth
-		for i = 1 to m.numverts do setVert m i ((getVert m i) + [0, 0, dz])
+		local openEdges = (meshop.getOpenEdges m) as array
+		local frontVerts = for v in verts collect (v + [0, 0, front])
+		local backVerts = for v in verts collect (v + [0, 0, back])
+		local backFaces = for fc in faces collect [fc.z + nv, fc.y + nv, fc.x + nv]
+		local sideFaces = #()
+		for e in openEdges do
+		(
+			local fi = (e - 1) / 3 + 1
+			local k = (mod (e - 1) 3) as integer
+			local fc = faces[fi]
+			local a = (fc[k + 1]) as integer
+			local b = (fc[(mod (k + 1) 3) as integer + 1]) as integer
+			append sideFaces [b, a, a + nv]
+			append sideFaces [b, a + nv, b + nv]
+		)
+		verts = frontVerts + backVerts
+		faces = faces + backFaces + sideFaces
 	)
-	for f = 1 to m.numfaces do setFaceMatID m f 1
+	setMesh m verts:verts faces:faces
+	for f = 1 to m.numfaces do ( setFaceMatID m f 1; setFaceSmoothGroup m f 0 )
+	-- hide the triangulation of the front/back and the side diagonals
+	meshop.autoEdge m #all 1.0 type:#setClear
 	ok
 )
 
