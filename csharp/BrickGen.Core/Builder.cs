@@ -747,10 +747,30 @@ namespace BrickGen
                         double pitchZ = p.BrickH + p.BedJoint;
                         int c = up ? (int)Math.Ceiling(ey / pitchZ) - 1 : (int)Math.Floor((ey - p.BrickH) / pitchZ) + 1;
                         c = Math.Max(0, c);
+                        // row k into the wall follows facade course c + k (plan view of
+                        // the bond: stack bond stays aligned, stretcher bond alternates)
+                        int nRows = (int)Math.Ceiling(T / (p.BrickB + p.HeadJoint)) + 1;
                         var fbond = Bonds.Get(p.BondType);
-                        var fOffs = Bonds.CourseOffsets(fbond, c + 1, p.Seed, p.BrickL, p.BrickB, p.HeadJoint, p.WildMinOverlap);
-                        var units = Bonds.CourseDef(fbond, c).Units;
-                        double o = fOffs[c] + p.StartOffset;
+                        var fOffs = Bonds.CourseOffsets(fbond, c + nRows, p.Seed, p.BrickL, p.BrickB, p.HeadJoint, p.WildMinOverlap);
+                        var rowUnits = new Unit[nRows][];
+                        var rowOffs = new double[nRows];
+                        for (int k = 0; k < nRows; k++)
+                        {
+                            var units = Bonds.CourseDef(fbond, c + k).Units;
+                            double o = fOffs[c + k] + p.StartOffset;
+                            if (!up)
+                            {
+                                // mirrored along x: units in reverse order, pattern start mirrored
+                                double period = 0;
+                                foreach (var u in units) period += Bonds.UnitPitch(u, p.BrickL, p.BrickB, p.HeadJoint);
+                                var rev = (Unit[])units.Clone();
+                                Array.Reverse(rev);
+                                units = rev;
+                                o = W - o - period + p.HeadJoint;
+                            }
+                            rowUnits[k] = units;
+                            rowOffs[k] = o;
+                        }
                         if (up)
                         {
                             stm = new double[] { 1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, ey };
@@ -760,15 +780,12 @@ namespace BrickGen
                         {
                             stm = new double[] { -1, 0, 0, 0, 0, 1, 0, 1, 0, W, 0, ey };
                             rect = new[] { new V2(W - x2, 0), new V2(W - x1, 0), new V2(W - x1, T), new V2(W - x2, T) };
-                            double period = 0;
-                            foreach (var u in units) period += Bonds.UnitPitch(u, p.BrickL, p.BrickB, p.HeadJoint);
-                            var rev = (Unit[])units.Clone();
-                            Array.Reverse(rev);
-                            units = rev;
-                            o = W - o - period + p.HeadJoint;
                         }
-                        offs = o;
-                        hBond = new Bond(false, new Course(0, 0, 0, units), new Course(0.5, 0, 0.5, units));
+                        offs = rowOffs[0];
+                        var rows = new Course[nRows];
+                        for (int k = 0; k < nRows; k++)
+                            rows[k] = new Course((rowOffs[k] - rowOffs[0]) / p.BrickL, 0, 0, rowUnits[k]);
+                        hBond = new Bond(false, rows);
                     }
                     // 0.5 mm towards the opening
                     stm[9] -= 0.5 * stm[3]; stm[10] -= 0.5 * stm[4]; stm[11] -= 0.5 * stm[5];

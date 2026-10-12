@@ -445,11 +445,28 @@ struct BrickGenMeshStruct
 				local c = if up then ((ceil (ey / pitchZ)) as integer) - 1 \
 					else ((floor ((ey - p.brickH) / pitchZ)) as integer) + 1
 				c = amax 0 c
+				-- row k into the wall follows facade course c + k (plan view of
+				-- the bond: stack bond stays aligned, stretcher bond alternates)
+				local nRows = ((ceil (T / (p.brickB + p.headJoint))) as integer) + 1
 				local fbond = BrickGenBonds.get p.bondType
-				local fOffs = BrickGenBonds.courseOffsets fbond (c + 1) p.seed p.brickL p.brickB p.headJoint p.wildMinOverlap
-				local cdef = BrickGenBonds.courseDef fbond c
-				local units = cdef[2]
-				local o = fOffs[c + 1] + p.startOffset
+				local fOffs = BrickGenBonds.courseOffsets fbond (c + nRows) p.seed p.brickL p.brickB p.headJoint p.wildMinOverlap
+				local rowUnits = #()
+				local rowOffs = #()
+				for k = 0 to nRows - 1 do
+				(
+					local units = (BrickGenBonds.courseDef fbond (c + k))[2]
+					local o = fOffs[c + k + 1] + p.startOffset
+					if not up do
+					(
+						-- mirrored along x: units in reverse order, pattern start mirrored
+						local period = 0.0
+						for u in units do period += BrickGenBonds.unitPitch u p.brickL p.brickB p.headJoint
+						units = for i = units.count to 1 by -1 collect units[i]
+						o = W - o - period + p.headJoint
+					)
+					append rowUnits units
+					append rowOffs o
+				)
 				if up then
 				(
 					stm = matrix3 [1, 0, 0] [0, 0, -1] [0, 1, 0] [0, 0, ey]
@@ -457,17 +474,12 @@ struct BrickGenMeshStruct
 				)
 				else
 				(
-					-- mirrored along x: units in reverse order, pattern start mirrored
 					stm = matrix3 [-1, 0, 0] [0, 0, 1] [0, 1, 0] [W, 0, ey]
 					rect = #([W - x2, 0, 0], [W - x1, 0, 0], [W - x1, T, 0], [W - x2, T, 0])
-					local period = 0.0
-					for u in units do period += BrickGenBonds.unitPitch u p.brickL p.brickB p.headJoint
-					units = for i = units.count to 1 by -1 collect units[i]
-					o = W - o - period + p.headJoint
 				)
-				offs = o
-				hBond = BrickGenBond id:#revealRow label:"" courses:#( \
-					#([0, 0, 0], units), #([0.5, 0, 0.5], units))
+				offs = rowOffs[1]
+				local rows = for k = 1 to nRows collect #([(rowOffs[k] - rowOffs[1]) / p.brickL, 0, 0], rowUnits[k])
+				hBond = BrickGenBond id:#revealRow label:"" courses:rows
 			)
 			-- 0.5 mm towards the opening: covers sawn facade brick ends
 			-- instead of z-fighting with them
