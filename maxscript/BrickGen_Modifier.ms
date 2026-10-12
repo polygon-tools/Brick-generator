@@ -13,6 +13,20 @@
 -- Requires BrickGen_Region.ms and BrickGen_Mesh.ms (BrickGen_Startup.ms).
 -- Never change classID; never remove or reorder parameters.
 
+-- Viewport "flat only": keep the incoming mesh, i.e. the closed spline as
+-- 3ds Max caps it (one face with the openings as holes, no inner lines),
+-- moved forward like the bricks when "Dikte naar voren" is on.
+fn BrickGen_flatMesh modi m =
+(
+	if modi.depthForward and modi.revealDepth > 0.0 do
+	(
+		local dz = if modi.flipSide then -modi.revealDepth else modi.revealDepth
+		for i = 1 to m.numverts do setVert m i ((getVert m i) + [0, 0, dz])
+	)
+	for f = 1 to m.numfaces do setFaceMatID m f 1
+	ok
+)
+
 -- The node this evaluation is for. An instanced modifier (copy / paste
 -- instanced) is shared by several splines; 3ds Max does not tell a scripted
 -- modifier which one it is evaluating, so the incoming mesh (the closed
@@ -380,6 +394,7 @@ plugin simpleMeshMod BrickGenMod
 
 	-- ----------------------------------------------------------------- Build
 	on modifyMesh do if mesh != undefined do
+		if viewSimple and not BrickGenRendering and mesh.numverts > 0 then BrickGen_flatMesh this mesh else
 	(
 		-- (mesh is undefined when 3ds Max evaluates during a rollout open)
 		local t0 = timeStamp()
