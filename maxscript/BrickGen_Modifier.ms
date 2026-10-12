@@ -58,6 +58,7 @@ plugin simpleMeshMod BrickGenMod
 	(
 		bondType type:#integer ui:ddlBond default:1
 		startOffset type:#float ui:spnStartOffset default:0.0
+		bondRotated type:#boolean ui:chkBondRotated default:false
 	)
 	parameters pShape rollout:rShape
 	(
@@ -135,6 +136,7 @@ plugin simpleMeshMod BrickGenMod
 	(
 		dropdownlist ddlBond ""
 		spinner spnStartOffset "Startoffset (mm):" type:#float range:[-10000, 10000, 0]
+		checkbox chkBondRotated "90 graden gedraaid (staande stenen)"
 
 		on rBond open do
 		(
@@ -353,6 +355,18 @@ plugin simpleMeshMod BrickGenMod
 					matrix3 [-s, 0, 0] [0, 0, s] [0, s, 0] [maxX * s, minY * s, 0]
 				else
 					matrix3 [s, 0, 0] [0, 0, -s] [0, s, 0] [minX * s, minY * s, 0]
+				-- bond turned 90 degrees: build in a frame where "along" is up and
+				-- "up" runs from right to left, then turn back. Polygons
+				-- (x, y) -> (y, W - x); wall-local (u, depth, v) -> (W - v, depth, u).
+				-- Orientation preserving, so faces keep their winding.
+				if bondRotated and polys.count > 0 do
+				(
+					local wAlong = 0.0
+					for poly in polys do for pt in poly do if pt.x > wAlong do wAlong = pt.x
+					polys = for poly in polys collect
+						for pt in poly collect [pt.y, wAlong - pt.x, 0.0]
+					p.tm = (matrix3 [0, 0, 1] [0, 1, 0] [-1, 0, 0] [wAlong, 0, 0]) * p.tm
+				)
 				p.seed = seed
 				p.brickL = brickL
 				p.brickB = brickB
