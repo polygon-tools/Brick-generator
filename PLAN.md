@@ -324,6 +324,8 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 > 4. Testronde (alles samen, nog niet getest in Max): C#-geometrie (log toont "[C# … ms]"), C#-steenherkenning, nieuwe foto ook in materiaal, 8%-bijsnijding (geen voeg in steen), afgebroken hoekjes, relief zonder JPEG-blokjes, cel met passende verhouding (lange stenen), nieuwe paneelindeling, horizontale dagkanten (legvlak). Daarna Listener-regels "BrickGen…", renders en screenshot van het paneel sturen.
 > 5. Werkt alles: `C:\Tools\Brick-generator` verwijderen; scènes met de oude rode foto opnieuw koppelen via "Kies textuur...".
 >
+> Nieuw na de laatste test (ook nog te testen): **Verband → 90 graden gedraaid** (parameter `bondRotated`, achteraan in pBond): de modifier bouwt in een 90° gedraaid assenstelsel en draait terug; geen wijziging in de rekenkern (MAXScript en C# blijven gelijk).
+>
 > **Openstaand daarna:** kromme stenen (extra vertices, optioneel), betere herkenning voor lange stenen van wisselende lengte, schuine randen (puntgevels), rollagen.
 
 ## 12. Fasering met acceptatiecriteria
