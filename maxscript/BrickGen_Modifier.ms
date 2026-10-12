@@ -112,7 +112,12 @@ global BrickGenRendering = false
 fn BrickGen_setRendering v =
 (
 	BrickGenRendering = v
-	for m in (getClassInstances BrickGenMod) where m.viewSimple do try (notifyDependents m) catch ()
+	try
+	(
+		local mods = getClassInstances ::BrickGenMod
+		for m in mods where m.viewSimple do notifyDependents m
+	)
+	catch ( format "BrickGen: render-omschakeling mislukt: %\n" (getCurrentException()) )
 )
 callbacks.removeScripts id:#BrickGenRender
 callbacks.addScript #preRender "BrickGen_setRendering true" id:#BrickGenRender
