@@ -59,6 +59,7 @@ plugin simpleMeshMod BrickGenMod
 		bondType type:#integer ui:ddlBond default:1
 		startOffset type:#float ui:spnStartOffset default:0.0
 		bondRotated type:#boolean ui:chkBondRotated default:false
+		offsetY type:#float ui:spnOffsetY default:0.0
 	)
 	parameters pShape rollout:rShape
 	(
@@ -135,7 +136,8 @@ plugin simpleMeshMod BrickGenMod
 	rollout rBond "Verband"
 	(
 		dropdownlist ddlBond ""
-		spinner spnStartOffset "Startoffset (mm):" type:#float range:[-10000, 10000, 0]
+		spinner spnStartOffset "Offset X (mm):" type:#float range:[-100000, 100000, 0]
+		spinner spnOffsetY "Offset Y (mm):" type:#float range:[-100000, 100000, 0]
 		checkbox chkBondRotated "90 graden gedraaid (staande stenen)"
 
 		on rBond open do
@@ -393,6 +395,26 @@ plugin simpleMeshMod BrickGenMod
 				(p.atlas.name + ", " + ((p.atlas.stretchers.count + p.atlas.headers.count) as string) + " cellen")
 			p.atlasFlip = atlasFlip
 			p.atlasRotate = atlasRotate
+
+				-- Offset X / Y: shift the brick grid on the facade (positive = to the
+				-- right / up). X moves the bricks along their course (startOffset), Y
+				-- moves the courses: the polygons move by the opposite amount (modulo
+				-- one course) and p.tm moves them back. With the bond turned 90
+				-- degrees the roles of X and Y swap.
+				p.startOffset = if bondRotated then offsetY else startOffset
+				local gridUp = if bondRotated then -startOffset else offsetY
+				local pitchZ = p.brickH + p.bedJoint
+				if pitchZ > 0.0 and polys.count > 0 do
+				(
+					local dy = mod (-gridUp) pitchZ
+					if dy < 0.0 do dy += pitchZ
+					if dy > 0.001 do
+					(
+						polys = for poly in polys collect
+							for pt in poly collect [pt.x, pt.y + dy, 0.0]
+						p.tm = (transMatrix [0, 0, -dy]) * p.tm
+					)
+				)
 				if polys.count > 0 do
 				(
 					-- C# builder when available (bin\BrickGen.Core.dll), else MAXScript

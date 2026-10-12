@@ -326,6 +326,8 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 >
 > Nieuw na de laatste test (ook nog te testen): **Verband → 90 graden gedraaid** (parameter `bondRotated`, achteraan in pBond): de modifier bouwt in een 90° gedraaid assenstelsel en draait terug; geen wijziging in de rekenkern (MAXScript en C# blijven gelijk).
 >
+> Ook nieuw (te testen): **Offset Y** (parameter `offsetY`, achteraan in pBond) naast Offset X (= bestaande `startOffset`): verschuift de lagen; de modifier verschuift de polygonen modulo één laag en compenseert in p.tm. Bij 90° gedraaid wisselen X en Y van rol.
+>
 > **Openstaand daarna:** kromme stenen (extra vertices, optioneel), betere herkenning voor lange stenen van wisselende lengte, schuine randen (puntgevels), rollagen.
 
 ## 12. Fasering met acceptatiecriteria
