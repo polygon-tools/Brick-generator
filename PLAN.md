@@ -332,6 +332,8 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 >
 > Ook nieuw (te testen): instanced modifier (copy / paste instanced) op meerdere splines: `BrickGen_evalNode` kiest de spline waarvan de knopen-bbox past bij de inkomende mesh (3ds Max zegt een scripted modifier niet welke node hij evalueert); cache houdt tot 6 resultaten bij; Maak materiaal en de materiaalinstellingen gelden voor alle nodes van de modifier.
 >
+> Getest door de gebruiker (12/10): verhuis naar D: gelukt; "Viewport: enkel vlak" (blok zoals Extrude) werkt en bij renderen verschijnen de stenen (na fix `::BrickGenMod` in de render-callback).
+>
 > **Openstaand daarna:** kromme stenen (extra vertices, optioneel), betere herkenning voor lange stenen van wisselende lengte, schuine randen (puntgevels), rollagen.
 
 ## 12. Fasering met acceptatiecriteria
