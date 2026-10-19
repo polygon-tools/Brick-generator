@@ -48,7 +48,7 @@ macroScript BrickGen_ToggleViewBricks
 	buttonText:"Stenen aan/uit"
 	tooltip:"BrickGen: stenen in de viewports aan/uit (render toont altijd stenen)"
 (
-	local mods = getClassInstances BrickGenMod
+	local mods = getClassInstances ::BrickGenMod
 	if mods.count > 0 do
 	(
 		local newVal = not mods[1].viewSimple

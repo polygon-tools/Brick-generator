@@ -13,6 +13,77 @@
 -- Requires BrickGen_Region.ms and BrickGen_Mesh.ms (BrickGen_Startup.ms).
 -- Never change classID; never remove or reorder parameters.
 
+-- ---------------------------------------------------------------------------
+-- Copy / paste settings between BrickGen modifiers (not instances). All
+-- parameters (including the texture) and optionally the material. Also
+-- written to a file in the temp folder, so pasting works in another scene or
+-- after a restart.
+global BrickGenClipboard = undefined -- #(names, values, material)
+
+fn BrickGen_clipFile = ( (getDir #temp) + "\\BrickGen_instellingen.txt" )
+
+fn BrickGen_valueString v =
+(
+	if classOf v == String then
+		"\"" + (substituteString (substituteString v "\\" "\\\\") "\"" "\\\"") + "\""
+	else (v as string)
+)
+
+fn BrickGen_copySettings modi =
+(
+	local names = getPropNames modi
+	local vals = for n in names collect (getProperty modi n)
+	local node = refs.dependentNodes modi firstOnly:true
+	local mat = if node != undefined then node.material else undefined
+	BrickGenClipboard = #(names, vals, mat)
+	local fh = try (createFile (BrickGen_clipFile())) catch undefined
+	if fh != undefined do
+	(
+		for i = 1 to names.count do format "%=%\n" (names[i] as string) (BrickGen_valueString vals[i]) to:fh
+		close fh
+	)
+	format "BrickGen: % instellingen gekopieerd%\n" names.count (if mat != undefined then (" (materiaal " + mat.name + ")") else "")
+)
+
+-- settings from the file (other scene / after a restart): no material
+fn BrickGen_readClipFile =
+(
+	local f = BrickGen_clipFile()
+	if not (doesFileExist f) do return undefined
+	local names = #()
+	local vals = #()
+	local fh = openFile f mode:"r"
+	while not (eof fh) do
+	(
+		local line = readLine fh
+		local i = findString line "="
+		if i != undefined do
+		(
+			local v = try (execute (substring line (i + 1) -1)) catch undefined
+			if v != undefined do
+			(
+				append names ((substring line 1 (i - 1)) as name)
+				append vals v
+			)
+		)
+	)
+	close fh
+	if names.count == 0 then undefined else #(names, vals, undefined)
+)
+
+fn BrickGen_pasteSettings modi withMaterial =
+(
+	local clip = if BrickGenClipboard != undefined then BrickGenClipboard else BrickGen_readClipFile()
+	if clip == undefined then ( messageBox "Kopieer eerst de instellingen van een BrickGen-gevel." title:"BrickGen"; false )
+	else
+	(
+		for i = 1 to clip[1].count do try (setProperty modi clip[1][i] clip[2][i]) catch ()
+		if withMaterial and clip[3] != undefined do
+			for n in (refs.dependentNodes modi) do n.material = clip[3]
+		true
+	)
+)
+
 -- Viewport "flat only": a simple slab like Extrude. The incoming mesh is the
 -- closed spline as 3ds Max caps it (one face with the openings as holes);
 -- it becomes the front and back, its open edges (outline and openings) get
@@ -112,7 +183,12 @@ global BrickGenRendering = false
 fn BrickGen_setRendering v =
 (
 	BrickGenRendering = v
-	for m in (getClassInstances BrickGenMod) where m.viewSimple do try (notifyDependents m) catch ()
+	try
+	(
+		local mods = getClassInstances ::BrickGenMod
+		for m in mods where m.viewSimple do notifyDependents m
+	)
+	catch ( format "BrickGen: render-omschakeling mislukt: %\n" (getCurrentException()) )
 )
 callbacks.removeScripts id:#BrickGenRender
 callbacks.addScript #preRender "BrickGen_setRendering true" id:#BrickGenRender
@@ -222,6 +298,26 @@ plugin simpleMeshMod BrickGenMod
 	)
 
 	-- ============================================================== rollouts
+	rollout rCopy "Instellingen kopieren / plakken"
+	(
+		button btnCopy "Kopieer" width:70 across:2
+		button btnPaste "Plak" width:70
+		button btnPasteSel "Plak op alle geselecteerde" width:150
+		checkbox chkWithMat "Met materiaal" checked:true
+
+		on btnCopy pressed do BrickGen_copySettings this
+		on btnPaste pressed do
+			if BrickGen_pasteSettings this chkWithMat.checked do format "BrickGen: instellingen geplakt\n"
+		on btnPasteSel pressed do
+		(
+			local n = 0
+			for obj in (selection as array) do
+				for m in obj.modifiers where classOf m == ::BrickGenMod do
+					if BrickGen_pasteSettings m chkWithMat.checked do n += 1
+			format "BrickGen: instellingen geplakt op % gevel(s)\n" n
+		)
+	)
+
 	rollout rWall "Gevel"
 	(
 		checkbox chkFlip "Andere kant (gevel omdraaien)"
@@ -397,6 +493,11 @@ plugin simpleMeshMod BrickGenMod
 			spnReliefMortar.value = uiReliefMortar
 		)
 		on cpMortar changed c do ( uiMortarCol = c; bgUpdateMaterial() )
+		-- a colour typed or pasted in the colour dialog does not always send
+		-- "changed": check twice a second
+		timer tmrColor interval:500
+		on tmrColor tick do
+			if cpMortar.color != uiMortarCol do ( uiMortarCol = cpMortar.color; bgUpdateMaterial() )
 		on spnReliefMortar changed v do ( uiReliefMortar = v; bgUpdateMaterial() )
 	)
 

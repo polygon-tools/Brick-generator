@@ -46,6 +46,9 @@ Het resultaat wordt gecachet: zolang spline en parameters niet veranderen, wordt
 
 Beperkingen van deze eerste versie: segmenten worden als rechte lijnen tussen de knooppunten behandeld (bogen nog niet); schuine randen (puntgevel) worden per laag verticaal afgezaagd, in kleine trapjes. De modifier moet rechtstreeks op de Line of Editable Spline staan, niet op een Rectangle; zet die eerst om naar een Editable Spline.
 
+### Instellingen kopiëren naar andere gevels
+Bovenaan de modifier: **Kopieer** neemt alle instellingen (ook de textuur) van deze gevel; **Plak** zet ze op een andere BrickGen-gevel, **Plak op alle geselecteerde** op alle geselecteerde gevels tegelijk. Met **Met materiaal** krijgen ze ook hetzelfde materiaal (voegkleur, glans, relief). De instellingen worden ook in een bestand in de temp-map bewaard: plakken werkt dus ook in een andere scène of na een herstart (dan zonder materiaal).
+
 ### Als losse muur (object)
 
 - **Create-panel → Geometry → BrickGen → BrickWall.** Klik het startpunt aan, sleep voor de lengte, beweeg de muis voor de hoogte en klik om te bevestigen.
