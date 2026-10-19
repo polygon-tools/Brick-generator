@@ -84,6 +84,55 @@ fn BrickGen_pasteSettings modi withMaterial =
 	)
 )
 
+-- "Textuur herladen": the photo was changed on disk. 3ds Max does not notice
+-- that by itself. The bricks are detected again, the photo's bitmaps are
+-- reloaded in every material and every BrickGen using this photo is rebuilt.
+fn BrickGen_reloadTexture modi =
+(
+	local f = modi.atlasFile
+	if f == "" or not (doesFileExist f) then
+	(
+		messageBox (if f == "" then "Kies eerst een textuur." else ("Textuur niet gevonden:\n" + f)) title:"BrickGen"
+		false
+	)
+	else
+	(
+		-- 3ds Max keeps loaded images in memory
+		try (freeSceneBitmaps()) catch ()
+		::BrickGenAtlasLib.cache = Dictionary #string
+		local js = ::BrickGenDetect.atlasJsonFor f modi.brickL modi.brickB modi.brickH modi.bedJoint modi.headJoint force:true
+		if (::BrickGenAtlasLib.get js) == undefined then
+		(
+			messageBox ("BrickGen vond geen bruikbare stenen in:\n" + f) title:"BrickGen"
+			false
+		)
+		else
+		(
+			local fname = toLower (filenameFromPath f)
+			local nMaps = 0
+			for b in (getClassInstances Bitmaptexture) do
+			(
+				local bf = try (b.fileName) catch undefined
+				if bf != undefined and (toLower (filenameFromPath bf)) == fname do
+				(
+					try (b.reload()) catch ()
+					nMaps += 1
+				)
+			)
+			::BrickGenAtlasRev += 1
+			local key = toLower f
+			local nMods = 0
+			for m in (getClassInstances ::BrickGenMod) where (toLower m.atlasFile) == key do
+			(
+				try (notifyDependents m) catch ()
+				nMods += 1
+			)
+			format "BrickGen: textuur % herladen (% bitmap(s), % BrickGen-modifier(s))\n" (filenameFromPath f) nMaps nMods
+			true
+		)
+	)
+)
+
 -- Viewport "flat only": a simple slab like Extrude. The incoming mesh is the
 -- closed spline as 3ds Max caps it (one face with the openings as holes);
 -- it becomes the front and back, its open edges (outline and openings) get
@@ -381,6 +430,8 @@ plugin simpleMeshMod BrickGenMod
 			button btnAtlas "Kies textuur..." width:90 across:2
 			button btnAtlasClear "Geen" width:50
 			button btnAtlasCheck "Stenen controleren..." width:140
+			button btnAtlasReload "Textuur herladen" width:140 \
+				tooltip:"Na het aanpassen van de foto: stenen opnieuw zoeken, de foto in het materiaal verversen en alle gevels met deze foto opnieuw opbouwen."
 			checkbox chkAtlasFlip "Random spiegelen"
 			checkbox chkAtlasRotate "Random 180 graden draaien"
 		)
@@ -436,6 +487,7 @@ plugin simpleMeshMod BrickGenMod
 			if js == undefined then messageBox "Kies eerst een textuur." title:"BrickGen"
 			else BrickGenAtlasEditor_open js this
 		)
+		on btnAtlasReload pressed do BrickGen_reloadTexture this
 		on btnAtlasClear pressed do
 		(
 			atlasFile = ""
