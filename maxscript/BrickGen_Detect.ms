@@ -473,7 +473,7 @@ struct BrickGenDetectStruct
 		local out = cachePath imgPath
 		local sig = inputSig imgPath L B H bedJoint headJoint
 		if not force and hasDictValue memo (sig + "|" + imgPath) and doesFileExist out do return out
-		local off = Dictionary #string
+		local offCells = Dictionary #string
 		if doesFileExist out do
 		(
 			local old = try (BrickGenJson_parseFile out) catch undefined
@@ -484,7 +484,7 @@ struct BrickGenDetectStruct
 			)
 			if old != undefined do
 				for c in (BrickGenJson_get old "cells" #()) where (BrickGenJson_get c "disabled" false) do
-					off[cellKey (BrickGenJson_get c "x" 0) (BrickGenJson_get c "y" 0) (BrickGenJson_get c "w" 1) (BrickGenJson_get c "h" 1)] = true
+					offCells[cellKey (BrickGenJson_get c "x" 0) (BrickGenJson_get c "y" 0) (BrickGenJson_get c "w" 1) (BrickGenJson_get c "h" 1)] = true
 		)
 		local t0 = timeStamp()
 		local res = detect imgPath L B H bedJoint headJoint
@@ -516,7 +516,7 @@ struct BrickGenDetectStruct
 			local c = cells[i]
 			if c[5] == "stretcher" do ns += 1
 			format "  {\"id\": %, \"x\": %, \"y\": %, \"w\": %, \"h\": %, \"kind\": \"%\", \"disabled\": %}%\n" \
-				(i - 1) c[1] c[2] c[3] c[4] c[5] (hasDictValue off (cellKey c[1] c[2] c[3] c[4])) \
+				(i - 1) c[1] c[2] c[3] c[4] c[5] (hasDictValue offCells (cellKey c[1] c[2] c[3] c[4])) \
 				(if i < cells.count then "," else "") to:ss
 		)
 		format " ]\n}\n" to:ss
