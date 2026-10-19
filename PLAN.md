@@ -336,7 +336,7 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 >
 > Ook nieuw (te testen): rollout *Instellingen kopieren / plakken* (Kopieer / Plak / Plak op alle geselecteerde, optioneel met materiaal; ook via `%TEMP%\\BrickGen_instellingen.txt`); voegkleur wordt ook toegepast als de kleur in het kleurvenster geplakt wordt (timer in rJoint).
 >
-> Ook nieuw (te testen): knop **Textuur herladen** (rMat, `BrickGen_reloadTexture`): na het aanpassen van de foto op schijf. `freeSceneBitmaps`, herkenning opnieuw (`atlasFor ... force:true`; uitgezette cellen met dezelfde rechthoek blijven uit), `reload` van elke Bitmaptexture met die bestandsnaam, `BrickGenAtlasRev` +1 en `notifyDependents` op elke BrickGen met die foto. Versie `2026-10-19b`.
+> Ook nieuw (te testen): knop **Textuur herladen** (rMat, `BrickGen_reloadTexture`): na het aanpassen van de foto op schijf. `freeSceneBitmaps`, herkenning opnieuw (`atlasFor ... force:true`; uitgezette cellen met dezelfde rechthoek blijven uit), `reload` van elke Bitmaptexture met die bestandsnaam, `BrickGenAtlasRev` +1 en `notifyDependents` op elke BrickGen met die foto. Versie `2026-10-19c`.
 >
 > **Openstaand daarna:** kromme stenen (extra vertices, optioneel), betere herkenning voor lange stenen van wisselende lengte, schuine randen (puntgevels), rollagen.
 
