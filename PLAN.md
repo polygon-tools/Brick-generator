@@ -334,6 +334,8 @@ Puur client-side: HTML + JS + canvas, geen frameworks nodig (eventueel een klein
 >
 > Getest door de gebruiker (12/10): verhuis naar D: gelukt; "Viewport: enkel vlak" (blok zoals Extrude) werkt en bij renderen verschijnen de stenen (na fix `::BrickGenMod` in de render-callback).
 >
+> Ook nieuw (te testen): rollout *Instellingen kopieren / plakken* (Kopieer / Plak / Plak op alle geselecteerde, optioneel met materiaal; ook via `%TEMP%\\BrickGen_instellingen.txt`); voegkleur wordt ook toegepast als de kleur in het kleurvenster geplakt wordt (timer in rJoint).
+>
 > **Openstaand daarna:** kromme stenen (extra vertices, optioneel), betere herkenning voor lange stenen van wisselende lengte, schuine randen (puntgevels), rollagen.
 
 ## 12. Fasering met acceptatiecriteria
