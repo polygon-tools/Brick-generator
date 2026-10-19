@@ -454,23 +454,37 @@ struct BrickGenDetectStruct
 			(H as string) -- joints are measured in the photo, not taken from BrickGen
 	),
 
+	-- key of a cell by its rectangle, to carry "disabled" over to a new detection
+	fn cellKey x y w h =
+	(
+		local ss = stringStream ""
+		format "%|%|%|%" ((x as float) as integer) ((y as float) as integer) ((w as float) as integer) ((h as float) as integer) to:ss
+		ss as string
+	),
+
 	-- The atlas JSON for a photo: from the cache when the photo and brick sizes
-	-- are unchanged, otherwise detected and written. Returns the JSON path or
-	-- undefined (message in the Listener).
-	fn atlasFor imgPath L B H bedJoint headJoint =
+	-- are unchanged, otherwise detected and written. force: detect again anyway
+	-- (button "Textuur herladen"). Cells switched off before stay off when the
+	-- same rectangle is found again. Returns the JSON path or undefined
+	-- (message in the Listener).
+	fn atlasFor imgPath L B H bedJoint headJoint force:false =
 	(
 		if not (doesFileExist imgPath) do return undefined
 		local out = cachePath imgPath
 		local sig = inputSig imgPath L B H bedJoint headJoint
-		if hasDictValue memo (sig + "|" + imgPath) and doesFileExist out do return out
+		if not force and hasDictValue memo (sig + "|" + imgPath) and doesFileExist out do return out
+		local off = Dictionary #string
 		if doesFileExist out do
 		(
 			local old = try (BrickGenJson_parseFile out) catch undefined
-			if old != undefined and (BrickGenJson_get old "source" "") == sig do
+			if not force and old != undefined and (BrickGenJson_get old "source" "") == sig do
 			(
 				memo[sig + "|" + imgPath] = out
 				return out
 			)
+			if old != undefined do
+				for c in (BrickGenJson_get old "cells" #()) where (BrickGenJson_get c "disabled" false) do
+					off[cellKey (BrickGenJson_get c "x" 0) (BrickGenJson_get c "y" 0) (BrickGenJson_get c "w" 1) (BrickGenJson_get c "h" 1)] = true
 		)
 		local t0 = timeStamp()
 		local res = detect imgPath L B H bedJoint headJoint
@@ -501,8 +515,9 @@ struct BrickGenDetectStruct
 		(
 			local c = cells[i]
 			if c[5] == "stretcher" do ns += 1
-			format "  {\"id\": %, \"x\": %, \"y\": %, \"w\": %, \"h\": %, \"kind\": \"%\", \"disabled\": false}%\n" \
-				(i - 1) c[1] c[2] c[3] c[4] c[5] (if i < cells.count then "," else "") to:ss
+			format "  {\"id\": %, \"x\": %, \"y\": %, \"w\": %, \"h\": %, \"kind\": \"%\", \"disabled\": %}%\n" \
+				(i - 1) c[1] c[2] c[3] c[4] c[5] (hasDictValue off (cellKey c[1] c[2] c[3] c[4])) \
+				(if i < cells.count then "," else "") to:ss
 		)
 		format " ]\n}\n" to:ss
 		local fh = createFile out
@@ -519,10 +534,10 @@ struct BrickGenDetectStruct
 
 	-- The atlas JSON for what the user picked: a JSON as is, a photo via
 	-- detection (cached). Sizes in mm. undefined when nothing usable.
-	fn atlasJsonFor f L B H bedJoint headJoint =
+	fn atlasJsonFor f L B H bedJoint headJoint force:false =
 	(
 		if f == undefined or f == "" then undefined
-		else if isImage f then atlasFor f L B H bedJoint headJoint
+		else if isImage f then atlasFor f L B H bedJoint headJoint force:force
 		else f
 	)
 )
