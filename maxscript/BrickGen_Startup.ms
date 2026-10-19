@@ -30,7 +30,9 @@
 
 	::BrickGenFormats.load (pathConfig.appendPath BrickGenRoot "presets\\formats.json")
 	local native = ::BrickGenNative.load ::BrickGenRoot
-	format "BrickGen geladen uit % (%)\n" ::BrickGenRoot (if native then "snelle C#-module actief" else "zonder C#-module")
+	-- bump on every release, so the Listener shows which version is loaded
+	global BrickGenVersion = "2026-10-19"
+	format "BrickGen % geladen uit % (%)\n" ::BrickGenVersion ::BrickGenRoot (if native then "snelle C#-module actief" else "zonder C#-module")
 )
 
 macroScript BrickGen_CreateWall
