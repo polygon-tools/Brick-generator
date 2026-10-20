@@ -11,6 +11,7 @@ Kort:
 - De modifier bouwt de geometrie met `bin/BrickGen.Core.dll` (C#, bron `csharp/BrickGen.Core/Builder.cs`, een port van `BrickGen_Mesh.ms` e.a.). **Wijzig je het algoritme, wijzig dan beide** en bouw de DLL opnieuw met `tools/build_native.sh`. Zonder DLL valt BrickGen terug op MAXScript.
 - Laadvolgorde staat in `maxscript/BrickGen_Startup.ms`. Een nieuw bestand moet daar ook bij.
 - `BrickGenVersion` in `BrickGen_Startup.ms` ophogen (datum) bij elke versie die de gebruiker gaat mergen.
+- Verandert de UI (knoppen, labels, werkwijze)? Werk `tools/make_manual.py` bij en maak `docs/BrickGen_Handleiding.pdf` opnieuw (versienummer gelijk aan `BrickGenVersion`).
 - Kleine commits per afgewerkt onderdeel. Werk PLAN.md bij als een beslissing verandert.
 - MAXScript-valkuilen (getest in 3ds Max 2026):
   - In een struct kan een functie enkel functies aanroepen die **eerder** in de struct staan (anders: "Call needs function or class, got: undefined").

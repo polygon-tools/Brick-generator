@@ -12,6 +12,8 @@ Volledige specificatie en planning: [PLAN.md](PLAN.md).
 | 3ds Max | 2022 of nieuwer (de code heeft minstens 2017.1 nodig, voor `Dictionary` en `Integer64`) |
 | V-Ray | 6 of nieuwer (pas nodig vanaf fase 2, voor "Maak materiaal") |
 
+Handleiding voor gebruikers (installatie, alle knoppen, texturen, doorgeven aan een collega): [docs/BrickGen_Handleiding.pdf](docs/BrickGen_Handleiding.pdf). Opnieuw maken na een UI-wijziging: `python3 tools/make_manual.py`.
+
 ## Installatie
 
 1. Clone of kopieer deze repo naar een vaste plaats (lokaal of op de gedeelde schijf), bv. `D:\Tools\Brick-generator`.
